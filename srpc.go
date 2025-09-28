@@ -1,8 +1,5 @@
 package srpc
 
-func fn() {
-}
-
 type RequestHeader struct {
 	ServiceMethod string // format: "Service.Method"
 	Metadata      map[string]string

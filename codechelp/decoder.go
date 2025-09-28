@@ -20,6 +20,6 @@ type commonDecoder interface {
 	Decode(any) error
 }
 
-func (co *commonDecoderWrapper[T]) Decode(r io.Reader, dst any) error {
+func (co *commonDecoderWrapper[T]) Decode(r io.Reader) (error) {
 	return co.newFunc(r).Decode(dst)
 }
