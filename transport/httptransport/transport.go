@@ -2,7 +2,6 @@ package httptransport
 
 import (
 	"io"
-	"net/http"
 
 	"github.com/tymbaca/srpc"
 )
@@ -10,8 +9,6 @@ import (
 type ClientConn struct{}
 
 func NewClientTransport(url string, method string) ClientConn {
-	req := http.NewRequestWithContext()
-	http.DefaultClient.Do()
 	return ClientConn{}
 }
 
