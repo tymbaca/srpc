@@ -1,0 +1,5 @@
+package srpc
+
+func NewClient()  {
+	
+}

@@ -15,11 +15,11 @@ func NewClientTransport(url string, method string) ClientConn {
 	return ClientConn{}
 }
 
-func (ht *ClientConn) WriteRequest(header srpc.RequestHeader, body io.Reader) error {
+func (ht *ClientConn) WriteRequest(header srpc.Request, body io.Reader) error {
 	panic("not implemented") // TODO: Implement
 }
 
-func (ht *ClientConn) ResponseHeader() (srpc.ResponseHeader, error) {
+func (ht *ClientConn) ResponseHeader() (srpc.Response, error) {
 	panic("not implemented") // TODO: Implement
 }
 
