@@ -4,6 +4,8 @@ package testpackage
 
 import (
 	"context"
+
+	inner "github.com/tymbaca/srpc/cmd/testpackage/inner"
 )
 
 type TestService2Server struct {

@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/tymbaca/srpc"
+	inner "github.com/tymbaca/srpc/cmd/testpackage/inner"
 )
 
 func NewTestService2Client(client *srpc.Client) *TestService2Client {
