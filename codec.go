@@ -7,9 +7,6 @@ type Codec interface {
 	Decoder
 }
 
-// TODO: way to distinguish io.Reader error and parsing error (e.g. when request
-// doesn't match the target type)
-
 type Decoder interface {
 	Decode(r io.Reader, dst any) error
 }

@@ -39,13 +39,19 @@ type method struct {
 }
 
 func Register[T any](s *Server, impl T) {
+	RegisterWithName(s, impl, "")
+}
+
+func RegisterWithName[T any](s *Server, impl T, name string) {
 	t := reflect.TypeFor[T]()
 	v := reflect.ValueOf(impl)
 
-	name := t.Name()
 	if name == "" {
-		slog.Debug(`t.Name() was "", getting t.Elem().Name()`)
-		name = t.Elem().Name()
+		name = t.Name()
+		if name == "" {
+			slog.Debug(`t.Name() was "", getting t.Elem().Name()`)
+			name = t.Elem().Name()
+		}
 	}
 
 	service := service{

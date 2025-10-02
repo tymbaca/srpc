@@ -1,4 +1,4 @@
-package httptransport
+package http
 
 import (
 	"context"
@@ -54,7 +54,9 @@ func TestHttpTransport(t *testing.T) {
 	svc := &TestServiceImpl{}
 
 	server := srpc.NewServer(codec.JSON)
-	srpc.Register(server, svc)
+	srpc.Register[TestService](server, svc)
+	// or:
+	// srpc.RegisterWithName(server, svc, "TestService")
 	go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 
 	client := srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost))
