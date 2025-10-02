@@ -11,7 +11,7 @@ import (
 
 var ErrServiceError = errors.New("service error")
 
-func NewClient(addr string, connector ClientTransport, codec Codec) *Client {
+func NewClient(addr string, connector ClientConnector, codec Codec) *Client {
 	return &Client{
 		addr:      addr,
 		connector: connector,
@@ -21,10 +21,11 @@ func NewClient(addr string, connector ClientTransport, codec Codec) *Client {
 
 type Client struct {
 	addr      string
-	connector ClientTransport
+	connector ClientConnector
 	codec     Codec
 }
 
+// TODO: check metadata in context
 func (c *Client) Call(ctx context.Context, serviceMethod ServiceMethod, req any, resp any) error {
 	conn, err := c.connector.Connect(ctx, c.addr)
 	if err != nil {

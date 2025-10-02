@@ -7,10 +7,22 @@ import (
 )
 
 func main() {
-	var s MyService = &ServerImpl{}
+	s := &ServerImpl{}
 	_ = s
+
+	runreflect(s)
+}
+
+// WARN: T must be an interface
+func runreflect[T any](s T) {
 	// t := reflect.TypeFor[MyService]()
-	// t := reflect.TypeOf(s)
+	t := reflect.TypeFor[T]()
+	name := t.Name()
+	if name == "" {
+		name = t.Elem().Name()
+		fmt.Println(`t.Name() was ""`)
+	}
+	fmt.Printf("t.Name(): %v\n", name)
 	// fmt.Printf("t.Name(): %v\n", t.Name())
 	// for i := range t.NumMethod() {
 	// 	m := t.Method(i)

@@ -22,7 +22,9 @@ type MyService interface {
 	// ...
 }
 
-type ServerImpl struct{}
+type ServerImpl struct {
+	A int
+}
 
 func (s *ServerImpl) GetNodes(ctx context.Context, req GetNodesReq) (GetNodesResp, error) {
 	// return GetNodesResp{strconv.Itoa(req.arg)}, nil

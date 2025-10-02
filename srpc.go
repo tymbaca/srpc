@@ -1,20 +1,44 @@
 package srpc
 
-import "io"
+import (
+	"io"
+	"strings"
+)
 
 type ServiceMethod string // e.g. "Service.Method"
+
+func (sm ServiceMethod) Split() (service string, method string, ok bool) {
+	parts := strings.Split(string(sm), ".")
+	if len(parts) != 2 {
+		return "", "", false
+	}
+
+	return parts[0], parts[1], true
+}
 
 type Request struct {
 	ServiceMethod ServiceMethod
 	Metadata      Metadata
-	Body          io.Reader
+	Body          io.Reader // TODO: close?
 }
 
 type Response struct {
 	ServiceMethod ServiceMethod // echoes that of the Request
 	Metadata      Metadata
+	StatusCode    StatusCode
 	Error         error
-	Body          io.Reader
+	Body          io.Reader // TODO: close?
 }
 
 type Metadata map[string][]string
+
+type StatusCode int
+
+// TODO: remove iota
+const (
+	StatusOK StatusCode = iota
+	StatusInvalidServiceMethod
+	StatusServiceNotFound
+	StatusMethodNotFound
+	StatusInternalError
+)
