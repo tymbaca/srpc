@@ -37,8 +37,10 @@ type StatusCode int
 // TODO: remove iota
 const (
 	StatusOK StatusCode = iota
+	StatusErrorFromService
 	StatusInvalidServiceMethod
 	StatusServiceNotFound
 	StatusMethodNotFound
+	StatusBadRequest
 	StatusInternalError
 )

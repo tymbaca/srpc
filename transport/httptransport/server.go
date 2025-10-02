@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/tymbaca/srpc"
@@ -17,10 +18,16 @@ type ServerListener struct {
 	conns chan srpc.ServerConn
 }
 
+func CreateAndStartListener(addr string, path string, method string) *ServerListener {
+	l := NewServerListener(addr, path, method)
+	go l.Start()
+	return l
+}
+
+// FIX: disallow methods without body
 func NewServerListener(addr string, path string, method string) *ServerListener {
 	l := &ServerListener{
 		server: http.Server{Addr: addr},
-		conns:  make(chan srpc.ServerConn),
 	}
 
 	mux := http.NewServeMux()
@@ -31,6 +38,9 @@ func NewServerListener(addr string, path string, method string) *ServerListener 
 }
 
 func (l *ServerListener) Start() {
+	l.conns = make(chan srpc.ServerConn)
+	defer close(l.conns)
+
 	err := l.server.ListenAndServe()
 	if err != nil {
 		l.serverErr.Store(err)
@@ -39,13 +49,33 @@ func (l *ServerListener) Start() {
 }
 
 func (l *ServerListener) handler(w http.ResponseWriter, r *http.Request) {
-	conn := &serverConn{
-		w: w, r: r,
-		close: make(chan struct{}),
+	defer func() {
+		if r.Body != nil {
+			r.Body.Close()
+		}
+	}()
+	serviceMethod, metadata, err := fromHeader(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		return
 	}
 
+	req := srpc.Request{
+		ServiceMethod: serviceMethod,
+		Metadata:      metadata,
+		Body:          r.Body,
+	}
+
+	conn := &serverConn{
+		w: w, r: r,
+		req:            req,
+		closeHandlerCh: make(chan struct{}),
+	}
+
+	// FIX: may be closed
 	l.conns <- conn
-	<-conn.close
+	<-conn.closeHandlerCh // wait until srpc handles the connection and calls [serverConn.Close]
 }
 
 // Accept waits for and returns the next connection to the listener.
@@ -72,23 +102,47 @@ type serverConn struct {
 	w http.ResponseWriter
 	r *http.Request
 
-	close chan struct{}
+	req srpc.Request
+
+	closeHandlerCh chan struct{}
 }
 
 func (c *serverConn) Request() srpc.Request {
-	panic("not implemented") // TODO: Implement
+	return c.req
 }
 
 func (c *serverConn) Addr() string {
-	panic("not implemented") // TODO: Implement
+	return c.r.RemoteAddr
 }
 
 func (c *serverConn) Send(ctx context.Context, resp srpc.Response) error {
-	panic("not implemented") // TODO: Implement
+	header, err := toHeader(resp.ServiceMethod, resp.Metadata)
+	if err != nil {
+		return fmt.Errorf("encode resp header: %w", err)
+	}
+
+	for k, vs := range header {
+		for _, v := range vs {
+			c.w.Header().Add(k, v)
+		}
+	}
+
+	if resp.Error != nil {
+		setError(c.w.Header())
+		c.w.Write([]byte(resp.Error.Error()))
+		return nil
+	}
+
+	n, err := io.Copy(c.w, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to send body (%d bytes written): %w", n, err)
+	}
+
+	return nil
 }
 
 // Close must be called after Send
 func (c *serverConn) Close() error {
-	close(c.close)
+	close(c.closeHandlerCh)
 	return nil
 }

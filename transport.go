@@ -8,6 +8,9 @@ type ClientConnector interface {
 
 type ClientConn interface {
 	Send(ctx context.Context, req Request) (Response, error)
+
+	// Close must be called after Send
+	Close() error
 }
 
 type ServerListener interface {

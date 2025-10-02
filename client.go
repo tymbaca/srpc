@@ -11,18 +11,18 @@ import (
 
 var ErrServiceError = errors.New("service error")
 
-func NewClient(addr string, connector ClientConnector, codec Codec) *Client {
+func NewClient(addr string, codec Codec, connector ClientConnector) *Client {
 	return &Client{
 		addr:      addr,
-		connector: connector,
 		codec:     codec,
+		connector: connector,
 	}
 }
 
 type Client struct {
 	addr      string
-	connector ClientConnector
 	codec     Codec
+	connector ClientConnector
 }
 
 // TODO: check metadata in context

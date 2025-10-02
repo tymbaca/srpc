@@ -62,13 +62,3 @@ func runreflect[T any](s T) {
 
 	fmt.Printf("getNodesReqVal.Interface(): %#v\n", getNodesReqVal.Interface())
 }
-
-func toValues(ins ...any) []reflect.Value {
-	outs := make([]reflect.Value, 0, len(ins))
-	for _, in := range ins {
-		v := reflect.ValueOf(in)
-		outs = append(outs, v)
-	}
-
-	return outs
-}

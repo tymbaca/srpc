@@ -1,4 +1,4 @@
-package codechelp
+package codec
 
 import (
 	"io"

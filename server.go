@@ -3,8 +3,12 @@ package srpc
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"reflect"
+
+	"github.com/tymbaca/srpc/pkg/atomic"
+	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
 func NewServer(codec Codec) *Server {
@@ -17,6 +21,9 @@ func NewServer(codec Codec) *Server {
 type Server struct {
 	codec    Codec
 	services map[string]service
+
+	l      ServerListener
+	closed atomic.Value[bool]
 }
 
 type service struct {
@@ -52,8 +59,16 @@ func Register[T any](s *Server, impl T) {
 }
 
 func (s *Server) Start(ctx context.Context, l ServerListener) error {
-	for {
-		conn, err := l.Accept()
+	s.closed.Store(false)
+	s.l = l
+	defer s.l.Close()
+
+	for !s.closed.Load() {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		conn, err := s.l.Accept()
 		if err != nil {
 			slog.Error(err.Error())
 		}
@@ -65,6 +80,13 @@ func (s *Server) Start(ctx context.Context, l ServerListener) error {
 			}
 		}()
 	}
+
+	return nil
+}
+
+func (s *Server) Close() error {
+	s.closed.Store(true)
+	return s.l.Close()
 }
 
 func (s *Server) handleConn(ctx context.Context, conn ServerConn) (err error) {
@@ -73,43 +95,64 @@ func (s *Server) handleConn(ctx context.Context, conn ServerConn) (err error) {
 
 	serviceName, methodName, ok := req.ServiceMethod.Split()
 	if !ok {
-		return replyError(ctx, conn, req, StatusInvalidServiceMethod, "")
+		return conn.Send(ctx, respError(req, StatusInvalidServiceMethod, ""))
 	}
 
 	service, ok := s.services[serviceName]
 	if !ok {
-		return replyError(ctx, conn, req, StatusServiceNotFound, "")
+		return conn.Send(ctx, respError(req, StatusServiceNotFound, ""))
 	}
 
 	method, ok := service.methods[methodName]
 	if !ok {
-		return replyError(ctx, conn, req, StatusMethodNotFound, "")
+		return conn.Send(ctx, respError(req, StatusMethodNotFound, ""))
 	}
 
-	resp, err := method.call(ctx, req)
-	if err != nil {
-		return reply(ctx, conn, resp)
-	}
+	resp := s.call(method, ctx, req)
 
-	return nil
-}
-
-func (s *Server) call(m method, ctx context.Context, req Request) (Response, error) {
-	// TODO: put metadata in context
-	arg := reflect.New(m.val.Type().In(1)).Interface()
-	err := s.codec.Decode(req.Body, arg)
-
-	if err != nil {
-		return Response{}
-	}
-
-}
-
-func reply(ctx context.Context, conn ServerConn, resp Response) error {
 	return conn.Send(ctx, resp)
 }
 
-func replyError(ctx context.Context, conn ServerConn, req Request, statusCode StatusCode, errorMsg string, errorMsgArgs ...any) error {
+func (s *Server) call(m method, ctx context.Context, req Request) Response {
+	// TODO: put metadata in context
+
+	assert(m.val.Type().NumIn() == 2)
+	assert(m.val.Type().In(0) == reflect.TypeFor[context.Context]())
+
+	arg := reflect.New(m.val.Type().In(1)).Interface()
+	err := s.codec.Decode(req.Body, arg)
+	if err != nil {
+		return respError(req, StatusBadRequest, "can't decode: %w", err)
+	}
+
+	retVals := m.val.Call(toValues(ctx, arg))
+	assert(len(retVals) == 2)
+	assert(reflect.TypeOf(retVals[1]) == reflect.TypeFor[error]())
+
+	ret := retVals[0].Interface()
+	err = retVals[1].Interface().(error)
+	if err != nil {
+		return respError(req, StatusErrorFromService, "error from service: %w", err)
+	}
+
+	return resp(req, StatusOK, pipe.ToReader(func(w io.Writer) error {
+		return s.codec.Encode(w, ret)
+	}))
+}
+
+func resp(req Request, statusCode StatusCode, body io.Reader) Response {
+	resp := Response{
+		ServiceMethod: req.ServiceMethod,
+		Metadata:      Metadata{},
+		StatusCode:    statusCode,
+		Error:         nil,
+		Body:          body,
+	}
+
+	return resp
+}
+
+func respError(req Request, statusCode StatusCode, errorMsg string, errorMsgArgs ...any) Response {
 	resp := Response{
 		ServiceMethod: req.ServiceMethod,
 		Metadata:      Metadata{},
@@ -117,7 +160,8 @@ func replyError(ctx context.Context, conn ServerConn, req Request, statusCode St
 		Error:         fmt.Errorf(errorMsg, errorMsgArgs...),
 		Body:          nil,
 	}
-	conn.Send(ctx)
+
+	return resp
 }
 
 func getMethods(v reflect.Value) map[string]method {
@@ -153,4 +197,14 @@ func isSuitableMethod(method reflect.Value) bool {
 	}
 
 	return true
+}
+
+func toValues(ins ...any) []reflect.Value {
+	outs := make([]reflect.Value, 0, len(ins))
+	for _, in := range ins {
+		v := reflect.ValueOf(in)
+		outs = append(outs, v)
+	}
+
+	return outs
 }

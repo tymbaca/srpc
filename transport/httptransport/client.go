@@ -2,6 +2,7 @@ package httptransport
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -41,6 +42,7 @@ type ClientConn struct {
 	url    string
 	method string
 	client *http.Client
+	close  func() error
 }
 
 func (cl *ClientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response, error) {
@@ -49,7 +51,11 @@ func (cl *ClientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response
 		return srpc.Response{}, fmt.Errorf("create http request: %w", err)
 	}
 
-	httpReq.Header = http.Header(req.Metadata)
+	// WARN: is it safe to set a whole header like this?
+	httpReq.Header, err = toHeader(req.ServiceMethod, req.Metadata)
+	if err != nil {
+		return srpc.Response{}, fmt.Errorf("encode req header: %w", err)
+	}
 
 	httpResp, err := cl.client.Do(httpReq)
 	if err != nil {
@@ -64,12 +70,36 @@ func (cl *ClientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response
 	if httpResp.StatusCode != http.StatusOK {
 		respBody, err := io.ReadAll(httpResp.Body)
 		if err != nil {
-			return srpc.Response{}, fmt.Errorf("cannot ready response body (status: %s): %w", httpResp.Status, err)
+			return srpc.Response{}, fmt.Errorf("got bad status code: %s, cannot ready response body: %w", httpResp.Status, err)
 		}
 		resp.Error = fmt.Errorf("got bad status code: %s, body: %s", httpResp.Status, respBody)
 		return resp, nil
 	}
 
-	resp.Body = httpResp.Body
+	if httpResp.Body != nil {
+		cl.close = httpResp.Body.Close
+	}
+
+	resp.ServiceMethod, resp.Metadata, err = fromHeader(httpReq.Header)
+	if err != nil {
+		return srpc.Response{}, fmt.Errorf("decode resp header: %w", err)
+	}
+
+	if hasError(httpReq.Header) {
+		errMsg, err := io.ReadAll(httpResp.Body)
+		if err != nil {
+			return srpc.Response{}, fmt.Errorf("read error from response: %w", err)
+		}
+
+		resp.Error = errors.New(string(errMsg))
+	} else {
+		resp.Body = httpResp.Body
+	}
+
 	return resp, nil
+}
+
+// Close must be called after Send
+func (cl *ClientConn) Close() error {
+	return cl.close()
 }
