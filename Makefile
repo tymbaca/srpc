@@ -1,0 +1,3 @@
+gen:
+	@go build -o=bin/srpc-gen ./cmd/testpackage/aigen
+	@PATH="$(PATH):$(PWD)/bin" go generate ./...

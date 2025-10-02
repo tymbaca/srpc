@@ -6,14 +6,14 @@ import (
 	"context"
 )
 
-type TestServiceServer struct {
+type TestService2Server struct {
 	// TODO: fill
 }
 
-func (te *TestServiceServer) Add(ctx context.Context, req testpackage.AddReq) (testpackage.AddResp, error) {
+func (te *TestService2Server) Divide(ctx context.Context, req DivideReq) (DivideResp, error) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (te *TestServiceServer) Divide(ctx context.Context, req testpackage.DivideReq) (testpackage.DivideResp, error) {
+func (te *TestService2Server) Multiply(ctx context.Context, req inner.MultiplyReq) (inner.MultiplyResp, error) {
 	panic("not implemented") // TODO: Implement
 }

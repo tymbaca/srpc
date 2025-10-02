@@ -8,20 +8,20 @@ import (
 	"github.com/tymbaca/srpc"
 )
 
-func NewTestServiceClient(client *srpc.Client) *TestServiceClient {
-	return &TestServiceClient{client: client}
+func NewTestService2Client(client *srpc.Client) *TestService2Client {
+	return &TestService2Client{client: client}
 }
 
-type TestServiceClient struct {
+type TestService2Client struct {
 	client *srpc.Client
 }
 
-func (c *TestServiceClient) Add(ctx context.Context, req testpackage.AddReq) (resp testpackage.AddResp, err error) {
-	err = c.client.Call(ctx, "TestService.Add", req, &resp)
+func (c *TestService2Client) Divide(ctx context.Context, req DivideReq) (resp DivideResp, err error) {
+	err = c.client.Call(ctx, "TestService2.Divide", req, &resp)
 	return resp, err
 }
 
-func (c *TestServiceClient) Divide(ctx context.Context, req testpackage.DivideReq) (resp testpackage.DivideResp, err error) {
-	err = c.client.Call(ctx, "TestService.Divide", req, &resp)
+func (c *TestService2Client) Multiply(ctx context.Context, req inner.MultiplyReq) (resp inner.MultiplyResp, err error) {
+	err = c.client.Call(ctx, "TestService2.Multiply", req, &resp)
 	return resp, err
 }

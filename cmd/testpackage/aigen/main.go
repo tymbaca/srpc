@@ -23,7 +23,6 @@ type methodMeta struct {
 
 func main() {
 	target := flag.String("target", "", "name of interface to generate for (required)")
-	// no other flags by design (per your constraints)
 	flag.Parse()
 
 	if *target == "" {
@@ -31,20 +30,17 @@ func main() {
 		os.Exit(2)
 	}
 
-	// Determine directory to work in: prefer $GOFILE (the file with go:generate), otherwise "."
-	gofile := os.Getenv("GOFILE") // go generate sets this (base name of the file)
+	gofile := os.Getenv("GOFILE")
 	outDir := "."
 	if gofile != "" {
-		// GOFILE is base name; generator runs with working dir set to package dir, so it's safe
 		outDir = filepath.Dir(gofile)
-		if outDir == "" || outDir == "." {
+		if outDir == "" {
 			outDir = "."
 		}
 	}
 
-	// Load the package in the current directory so that types and scope are available
 	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedImports,
+		Mode: packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
 		Dir:  outDir,
 	}
 	pkgs, err := packages.Load(cfg, ".")
@@ -52,7 +48,6 @@ func main() {
 		failf("loading package: %v", err)
 	}
 	if packages.PrintErrors(pkgs) > 0 {
-		// packages.PrintErrors already printed; exit
 		os.Exit(1)
 	}
 	if len(pkgs) == 0 {
@@ -60,35 +55,33 @@ func main() {
 	}
 	pkg := pkgs[0]
 
-	// Find the target interface in package scope
 	obj := pkg.Types.Scope().Lookup(*target)
 	if obj == nil {
 		failf("interface %q not found in package %s", *target, pkg.Types.Name())
 	}
-
 	typ := obj.Type().Underlying()
 	iface, ok := typ.(*types.Interface)
 	if !ok {
 		failf("%q is not an interface", *target)
 	}
 
-	// If the interface has embedded interfaces — error per your instruction
 	if iface.NumEmbeddeds() > 0 {
-		failf("target interface %q contains embedded interfaces; this is not supported", *target)
+		failf("target interface %q has embedded interfaces; not supported", *target)
 	}
 
-	// Prepare qualifier for pretty type printing
-	qual := func(p *types.Package) string {
-		if p == nil {
+	// Qualifier for type printing: if a type is from the same package, omit package prefix
+	qualifier := func(other *types.Package) string {
+		if other == nil {
 			return ""
 		}
-		// Use package name as qualifier (this yields "pkg.Type")
-		return p.Name()
+		if other.Path() == pkg.Types.Path() {
+			// same package, no qualifier
+			return ""
+		}
+		return other.Name()
 	}
 
-	// Extract methods and validate signatures
 	var methods []methodMeta
-
 	for i := 0; i < iface.NumMethods(); i++ {
 		m := iface.Method(i)
 		sig, ok := m.Type().(*types.Signature)
@@ -98,27 +91,22 @@ func main() {
 		params := sig.Params()
 		results := sig.Results()
 
-		// Validate params: (context.Context, Req)
 		if params.Len() != 2 {
-			failf("method %s: expected 2 parameters (context.Context, Req), got %d", m.Name(), params.Len())
+			failf("method %s: expected 2 parameters, got %d", m.Name(), params.Len())
 		}
-		// Validate first param is context.Context
-		firstParam := params.At(0).Type()
-		if firstParam.String() != "context.Context" {
-			// string comparison is acceptable here (context.Context prints as "context.Context")
-			failf("method %s: first parameter must be context.Context, got %s", m.Name(), firstParam.String())
+		first := params.At(0).Type().String()
+		if first != "context.Context" {
+			failf("method %s: first parameter must be context.Context, got %s", m.Name(), first)
 		}
-		// Second param -> request type string
-		reqType := types.TypeString(params.At(1).Type(), qual)
+		reqType := types.TypeString(params.At(1).Type(), qualifier)
 
-		// Validate results: (Resp, error)
 		if results.Len() != 2 {
-			failf("method %s: expected 2 results (Resp, error), got %d", m.Name(), results.Len())
+			failf("method %s: expected 2 results, got %d", m.Name(), results.Len())
 		}
 		if results.At(1).Type().String() != "error" {
 			failf("method %s: second result must be error, got %s", m.Name(), results.At(1).Type().String())
 		}
-		respType := types.TypeString(results.At(0).Type(), qual)
+		respType := types.TypeString(results.At(0).Type(), qualifier)
 
 		methods = append(methods, methodMeta{
 			Name:     m.Name(),
@@ -127,11 +115,9 @@ func main() {
 		})
 	}
 
-	// Prepare output file paths
 	clientFile := filepath.Join(outDir, "client.srpc.go")
 	serverFile := filepath.Join(outDir, "server.srpc.go")
 
-	// If the client file doesn't exist, create it
 	if !fileExists(clientFile) {
 		src, err := generateClient(pkg.Name, *target, methods)
 		if err != nil {
@@ -145,7 +131,6 @@ func main() {
 		fmt.Printf("skipping %s (already exists)\n", clientFile)
 	}
 
-	// If the server file doesn't exist, create it
 	if !fileExists(serverFile) {
 		src, err := generateServer(pkg.Name, *target, methods)
 		if err != nil {
@@ -160,24 +145,18 @@ func main() {
 	}
 }
 
-// generateClient returns the raw Go source (unformatted) for client.srpc.go
 func generateClient(pkgName, target string, methods []methodMeta) ([]byte, error) {
 	var b bytes.Buffer
 
-	// Header & package
 	fmt.Fprintf(&b, "// Code generated by srpc-gen %s. DO NOT EDIT.\n\n", version)
 	fmt.Fprintf(&b, "package %s\n\n", pkgName)
 
-	// Imports
 	fmt.Fprintf(&b, "import (\n\t\"context\"\n\n\t\"github.com/tymbaca/srpc\"\n)\n\n")
 
-	// Constructor
-	fmt.Fprintf(&b, "func New%sClient(client *srpc.Client) *%sClient {\n\treturn &%sClient{ client: client }\n}\n\n", target, target, target)
+	fmt.Fprintf(&b, "func New%sClient(client *srpc.Client) *%sClient {\n\treturn &%sClient{client: client}\n}\n\n", target, target, target)
 
-	// Client struct
 	fmt.Fprintf(&b, "type %sClient struct {\n\tclient *srpc.Client\n}\n\n", target)
 
-	// Methods
 	for _, m := range methods {
 		fmt.Fprintf(&b, "func (c *%sClient) %s(ctx context.Context, req %s) (resp %s, err error) {\n",
 			target, m.Name, m.ReqType, m.RespType)
@@ -188,21 +167,16 @@ func generateClient(pkgName, target string, methods []methodMeta) ([]byte, error
 	return b.Bytes(), nil
 }
 
-// generateServer returns the raw Go source (unformatted) for server.srpc.go
 func generateServer(pkgName, target string, methods []methodMeta) ([]byte, error) {
 	var b bytes.Buffer
 
-	// Header & package
 	fmt.Fprintf(&b, "// Code generated by srpc-gen %s. DO NOT EDIT.\n\n", version)
 	fmt.Fprintf(&b, "package %s\n\n", pkgName)
 
-	// Imports
 	fmt.Fprintf(&b, "import (\n\t\"context\"\n)\n\n")
 
-	// Server struct
 	fmt.Fprintf(&b, "type %sServer struct {\n\t// TODO: fill\n}\n\n", target)
 
-	// Methods
 	for _, m := range methods {
 		fmt.Fprintf(&b, "func (te *%sServer) %s(ctx context.Context, req %s) (%s, error) {\n",
 			target, m.Name, m.ReqType, m.RespType)
@@ -212,12 +186,10 @@ func generateServer(pkgName, target string, methods []methodMeta) ([]byte, error
 	return b.Bytes(), nil
 }
 
-// writeFormattedFile runs go/format on src and writes to path
 func writeFormattedFile(path string, src []byte) error {
 	fmtSrc, err := format.Source(src)
 	if err != nil {
-		// helpful debugging on format failure: return original source as well
-		return fmt.Errorf("format.Source failed: %w\n\nunformatted source:\n%s", err, string(src))
+		return fmt.Errorf("format.Source failed: %w\nunformatted source:\n%s", err, string(src))
 	}
 	if err := os.WriteFile(path, fmtSrc, 0o644); err != nil {
 		return err
