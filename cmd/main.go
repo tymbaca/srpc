@@ -32,11 +32,11 @@ func runreflect[T any](s T) {
 	//
 	v := reflect.ValueOf(s)
 	//
-	// for i := range v.NumMethod() {
-	// 	m := v.Method(i)
-	// 	fmt.Printf("v.Method(%d): %v\n", i, m)
-	// 	fmt.Printf("v.Method(%d) type: %v\n", i, m.Type())
-	// }
+	for i := range v.NumMethod() {
+		m := v.Method(i)
+		fmt.Printf("v.Method(%d).Type().Name(): %v\n", i, m.Type().Name())
+		// fmt.Printf("v.Method(%d) type: %v\n", i, m.Type())
+	}
 
 	// fmt.Printf("v.MethodByName(\"GetNodes\").Type(): %v\n", v.MethodByName("GetNodes").Type())
 	getNodesMethod := v.MethodByName("GetNodes")

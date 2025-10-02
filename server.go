@@ -119,20 +119,19 @@ func (s *Server) call(m method, ctx context.Context, req Request) Response {
 	assert(m.val.Type().NumIn() == 2)
 	assert(m.val.Type().In(0) == reflect.TypeFor[context.Context]())
 
-	arg := reflect.New(m.val.Type().In(1)).Interface()
-	err := s.codec.Decode(req.Body, arg)
+	argVal := reflect.New(m.val.Type().In(1))
+	err := s.codec.Decode(req.Body, argVal.Interface())
 	if err != nil {
 		return respError(req, StatusBadRequest, "can't decode: %w", err)
 	}
 
-	retVals := m.val.Call(toValues(ctx, arg))
-	assert(len(retVals) == 2)
-	assert(reflect.TypeOf(retVals[1]) == reflect.TypeFor[error]())
+	retVals := m.val.Call(toValues(ctx, argVal.Elem().Interface()))
+	// assert(len(retVals) == 2)
+	// assert(reflect.TypeOf(retVals[1]) == reflect.TypeFor[error]())
 
 	ret := retVals[0].Interface()
-	err = retVals[1].Interface().(error)
-	if err != nil {
-		return respError(req, StatusErrorFromService, "error from service: %w", err)
+	if !retVals[1].IsNil() {
+		return respError(req, StatusErrorFromService, "error from service: %w", retVals[1].Interface().(error))
 	}
 
 	return resp(req, StatusOK, pipe.ToReader(func(w io.Writer) error {
@@ -168,7 +167,7 @@ func getMethods(v reflect.Value) map[string]method {
 	methods := make(map[string]method)
 	for i := range v.NumMethod() {
 		m := v.Method(i)
-		name := m.Type().Name()
+		name := v.Type().Method(i).Name
 
 		if isSuitableMethod(m) {
 			methods[name] = method{val: m}

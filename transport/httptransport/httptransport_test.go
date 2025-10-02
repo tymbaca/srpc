@@ -27,6 +27,7 @@ type TestService interface {
 type TestServiceImpl struct{}
 
 func (s *TestServiceImpl) Add(ctx context.Context, req AddReq) (AddResp, error) {
+	// return AddResp{}, errors.New("some err")
 	return AddResp{req.A + req.B}, nil
 }
 
@@ -43,4 +44,7 @@ func TestHttpTransport(t *testing.T) {
 	var resp AddResp
 	err := client.Call(ctx, "TestService.Add", AddReq{A: 10, B: 15}, &resp)
 	require.NoError(t, err)
+	require.Equal(t, 25, resp.Result)
+
+	// TODO: add test with service error
 }

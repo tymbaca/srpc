@@ -62,10 +62,7 @@ func (cl *ClientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response
 		return srpc.Response{}, fmt.Errorf("do http request: %w", err)
 	}
 
-	resp := srpc.Response{
-		ServiceMethod: req.ServiceMethod,
-		Metadata:      srpc.Metadata(httpResp.Header),
-	}
+	var resp srpc.Response
 
 	if httpResp.StatusCode != http.StatusOK {
 		respBody, err := io.ReadAll(httpResp.Body)
@@ -85,7 +82,7 @@ func (cl *ClientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response
 		return srpc.Response{}, fmt.Errorf("decode resp header: %w", err)
 	}
 
-	if hasError(httpReq.Header) {
+	if hasError(httpResp.Header) {
 		errMsg, err := io.ReadAll(httpResp.Body)
 		if err != nil {
 			return srpc.Response{}, fmt.Errorf("read error from response: %w", err)
