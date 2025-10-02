@@ -10,6 +10,7 @@ import (
 )
 
 var ErrServiceError = errors.New("service error")
+var ErrTransportError = errors.New("transport error")
 
 func NewClient(addr string, codec Codec, connector ClientConnector) *Client {
 	return &Client{
@@ -41,8 +42,16 @@ func (c *Client) Call(ctx context.Context, serviceMethod ServiceMethod, req any,
 		return fmt.Errorf("send request: %w", err)
 	}
 
-	if connResp.Error != nil {
-		return fmt.Errorf("%w: %s", ErrServiceError, connResp.Error)
+	if connResp.StatusCode != StatusOK {
+		coreErr := ErrTransportError
+		if connResp.StatusCode == StatusErrorFromService {
+			coreErr = ErrServiceError
+		}
+		if connResp.Error != nil {
+			return fmt.Errorf("%w: %s", coreErr, connResp.Error)
+		} else {
+			return fmt.Errorf("%w: (no error message)", coreErr)
+		}
 	}
 
 	err = c.codec.Decode(connResp.Body, resp)

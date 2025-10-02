@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/tymbaca/srpc"
 )
@@ -12,8 +13,27 @@ import (
 const (
 	_serviceMethodKey = "Srpc-Service-Method"
 	_metadataKey      = "Srpc-Metadata"
+	_statusKey        = "Srpc-Status"
 	_errorKey         = "Srpc-Error"
 )
+
+func setStatus(h http.Header, status srpc.StatusCode) {
+	h.Set(_statusKey, strconv.Itoa(int(status)))
+}
+
+func getStatus(h http.Header) (status srpc.StatusCode, err error) {
+	statusStr := h.Get(_statusKey)
+	if statusStr == "" {
+		return 0, fmt.Errorf("no status code in header")
+	}
+
+	statusInt, err := strconv.Atoi(statusStr)
+	if err != nil {
+		return 0, fmt.Errorf("convert status from header to int: %w", err)
+	}
+
+	return srpc.StatusCode(statusInt), nil
+}
 
 func setError(h http.Header) {
 	h.Set(_errorKey, "true")

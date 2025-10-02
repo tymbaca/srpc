@@ -156,7 +156,7 @@ func respError(req Request, statusCode StatusCode, errorMsg string, errorMsgArgs
 		ServiceMethod: req.ServiceMethod,
 		Metadata:      Metadata{},
 		StatusCode:    statusCode,
-		Error:         fmt.Errorf(errorMsg, errorMsgArgs...),
+		Error:         tern(errorMsg != "", fmt.Errorf(errorMsg, errorMsgArgs...), fmt.Errorf("code: %s", statusCode)),
 		Body:          nil,
 	}
 

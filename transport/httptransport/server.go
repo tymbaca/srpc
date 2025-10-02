@@ -127,6 +127,7 @@ func (c *serverConn) Send(ctx context.Context, resp srpc.Response) error {
 		}
 	}
 
+	setStatus(c.w.Header(), resp.StatusCode)
 	if resp.Error != nil {
 		setError(c.w.Header())
 		c.w.Write([]byte(resp.Error.Error()))

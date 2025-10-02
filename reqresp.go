@@ -34,6 +34,27 @@ type Metadata map[string][]string
 
 type StatusCode int
 
+func (s StatusCode) String() string {
+	switch s {
+	case StatusOK:
+		return "StatusOK"
+	case StatusErrorFromService:
+		return "StatusErrorFromService"
+	case StatusInvalidServiceMethod:
+		return "StatusInvalidServiceMethod"
+	case StatusBadRequest:
+		return "StatusBadRequest"
+	case StatusServiceNotFound:
+		return "StatusServiceNotFound"
+	case StatusMethodNotFound:
+		return "StatusMethodNotFound"
+	case StatusInternalError:
+		return "StatusInternalError"
+	}
+
+	return ""
+}
+
 // TODO: remove iota
 const (
 	StatusOK StatusCode = iota

@@ -77,7 +77,12 @@ func (cl *ClientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response
 		cl.close = httpResp.Body.Close
 	}
 
-	resp.ServiceMethod, resp.Metadata, err = fromHeader(httpReq.Header)
+	resp.StatusCode, err = getStatus(httpResp.Header)
+	if err != nil {
+		return srpc.Response{}, fmt.Errorf("get status from resp header: %w", err)
+	}
+
+	resp.ServiceMethod, resp.Metadata, err = fromHeader(httpResp.Header)
 	if err != nil {
 		return srpc.Response{}, fmt.Errorf("decode resp header: %w", err)
 	}
