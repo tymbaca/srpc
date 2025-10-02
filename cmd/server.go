@@ -2,16 +2,15 @@ package main
 
 import (
 	"context"
-
-	"github.com/tymbaca/srpc"
+	"fmt"
 )
 
 type (
 	GetNodesReq struct {
-		arg int
+		Arg int
 	}
 	GetNodesResp struct {
-		val string
+		Val string
 	}
 	CreateNodesReq  struct{}
 	CreateNodesResp struct{}
@@ -26,14 +25,15 @@ type MyService interface {
 type ServerImpl struct{}
 
 func (s *ServerImpl) GetNodes(ctx context.Context, req GetNodesReq) (GetNodesResp, error) {
-	panic("not implemented")
+	// return GetNodesResp{strconv.Itoa(req.arg)}, nil
+	return GetNodesResp{}, fmt.Errorf("some err")
 }
 
 func (s *ServerImpl) CreateNodes(ctx context.Context, req CreateNodesReq) (CreateNodesResp, error) {
 	panic("not implemented")
 }
 
-func genericserver() {
-	impl := &ServerImpl{}
-	srpc.NewServer[MyService](impl)
-}
+// func genericserver() {
+// 	impl := &ServerImpl{}
+// 	srpc.NewServer[MyService](impl)
+// }

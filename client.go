@@ -11,7 +11,7 @@ import (
 
 var ErrServiceError = errors.New("service error")
 
-func NewClient(addr string, connector ClientConnector, codec Codec) *Client {
+func NewClient(addr string, connector ClientTransport, codec Codec) *Client {
 	return &Client{
 		addr:      addr,
 		connector: connector,
@@ -21,7 +21,7 @@ func NewClient(addr string, connector ClientConnector, codec Codec) *Client {
 
 type Client struct {
 	addr      string
-	connector ClientConnector
+	connector ClientTransport
 	codec     Codec
 }
 
@@ -36,6 +36,9 @@ func (c *Client) Call(ctx context.Context, serviceMethod ServiceMethod, req any,
 		Metadata:      Metadata{}, // TODO:
 		Body:          pipe.ToReader(func(w io.Writer) error { return c.codec.Encode(w, req) }),
 	})
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
 
 	if connResp.Error != nil {
 		return fmt.Errorf("%w: %s", ErrServiceError, connResp.Error)

@@ -2,13 +2,18 @@ package srpc
 
 import "context"
 
-type ClientConnector interface {
+type ClientTransport interface {
 	Connect(ctx context.Context, addr string) (ClientConn, error)
 }
 
 type ClientConn interface {
 	Send(ctx context.Context, req Request) (Response, error)
 }
+
+//
+// type ServerTransport interface {
+// 	Listen(ctx context.Context, addr string) (ServerListener, error)
+// }
 
 type ServerListener interface {
 	// Accept waits for and returns the next connection to the listener.
@@ -23,4 +28,7 @@ type ServerConn interface {
 	Request() Request
 	Addr() string
 	Send(ctx context.Context, resp Response) error
+
+	// Close must be called after Send
+	Close() error
 }

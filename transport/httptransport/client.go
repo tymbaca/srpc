@@ -10,7 +10,7 @@ import (
 	"github.com/tymbaca/srpc"
 )
 
-func NewClientConnector(path string, method string) srpc.ClientConnector {
+func NewClientConnector(path string, method string) srpc.ClientTransport {
 	return &ClientConnector{
 		path:   path,
 		method: method,
