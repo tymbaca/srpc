@@ -25,6 +25,7 @@ func CreateAndStartListener(addr string, path string, method string) *ServerList
 }
 
 // FIX: disallow methods without body
+
 func NewServerListener(addr string, path string, method string) *ServerListener {
 	l := &ServerListener{
 		server: http.Server{Addr: addr},

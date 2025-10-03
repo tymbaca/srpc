@@ -19,8 +19,6 @@ import (
 
 const version = "v0.0.1"
 
-// ---------------- Data Models ----------------
-
 type methodMeta struct {
 	Name     string
 	ReqType  string
@@ -47,15 +45,11 @@ type fileData struct {
 	Methods []methodMeta
 }
 
-// ---------------- Templates ----------------
-
 //go:embed srpc.client.go.tmpl
 var clientTmpl string
 
 //go:embed srpc.server.go.tmpl
 var serverTmpl string
-
-// ---------------- Main ----------------
 
 func main() {
 	target := flag.String("target", "", "name of interface to generate for (required)")
@@ -77,8 +71,6 @@ func main() {
 	generateFiles(pkg.Name, *target, outDir, methods, imports, *only, *clientOut, *serverOut)
 }
 
-// ---------------- Package Loading ----------------
-
 func loadPackage(outDir string) *packages.Package {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
@@ -94,8 +86,6 @@ func loadPackage(outDir string) *packages.Package {
 	}
 	return pkgs[0]
 }
-
-// ---------------- Generation ----------------
 
 func generateFiles(pkgName, target, outDir string, methods []methodMeta, imports []importMeta, only string, clientOut, serverOut string) {
 	if clientOut == "" {
@@ -175,8 +165,6 @@ func renderTemplate(tmplSrc string, data fileData) ([]byte, error) {
 	}
 	return b.Bytes(), nil
 }
-
-// ---------------- Reflection ----------------
 
 func loadTargetInterface(pkg *packages.Package, target string) *types.Interface {
 	obj := pkg.Types.Scope().Lookup(target)
@@ -269,8 +257,6 @@ func addImportIfExternal(t types.Type, pkg *packages.Package, imports map[string
 		}
 	}
 }
-
-// ---------------- Utils ----------------
 
 func getOutDir() string {
 	gofile := os.Getenv("GOFILE")
