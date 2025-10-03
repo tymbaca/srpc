@@ -7,6 +7,7 @@ import (
 	"go/format"
 	"go/types"
 	"os"
+	"path"
 	"path/filepath"
 
 	"golang.org/x/tools/go/packages"
@@ -20,159 +21,210 @@ type methodMeta struct {
 	RespType string
 }
 
+type importMeta struct {
+	Name string
+	Path string
+}
+
+func (i importMeta) ImportString() string {
+	if _, nameFromPath := path.Split(i.Path); nameFromPath == i.Name || i.Name == "" {
+		return fmt.Sprintf("\"%s\"", i.Path)
+	}
+
+	return fmt.Sprintf("%s \"%s\"", i.Name, i.Path)
+}
+
 func main() {
 	target := flag.String("target", "", "name of interface to generate for (required)")
 	flag.Parse()
 
 	if *target == "" {
-		fmt.Fprintln(os.Stderr, "missing --target")
-		os.Exit(2)
+		failf("missing --target")
 	}
 
+	outDir := getOutDir()
+	pkg := loadPackage(outDir)
+	iface := loadTargetInterface(pkg, *target)
+
+	methods, imports := collectMethods(pkg, iface)
+
+	generateFiles(pkg.Name, *target, outDir, methods, imports)
+}
+
+func getOutDir() string {
 	gofile := os.Getenv("GOFILE")
-	outDir := "."
-	if gofile != "" {
-		outDir = filepath.Dir(gofile)
-		if outDir == "" {
-			outDir = "."
-		}
+	if gofile == "" {
+		return "."
 	}
+	if dir := filepath.Dir(gofile); dir != "" {
+		return dir
+	}
+	return "."
+}
 
+func loadPackage(outDir string) *packages.Package {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
 		Dir:  outDir,
 	}
+
 	pkgs, err := packages.Load(cfg, ".")
 	if err != nil {
 		failf("loading package: %v", err)
 	}
-	if packages.PrintErrors(pkgs) > 0 {
-		os.Exit(1)
+	if packages.PrintErrors(pkgs) > 0 || len(pkgs) == 0 {
+		failf("failed to load package")
 	}
-	if len(pkgs) == 0 {
-		failf("no packages loaded")
-	}
-	pkg := pkgs[0]
+	return pkgs[0]
+}
 
-	obj := pkg.Types.Scope().Lookup(*target)
+func loadTargetInterface(pkg *packages.Package, target string) *types.Interface {
+	obj := pkg.Types.Scope().Lookup(target)
 	if obj == nil {
-		failf("interface %q not found in package %s", *target, pkg.Types.Name())
+		failf("interface %q not found in package %s", target, pkg.Types.Name())
 	}
-	typ := obj.Type().Underlying()
-	iface, ok := typ.(*types.Interface)
+
+	iface, ok := obj.Type().Underlying().(*types.Interface)
 	if !ok {
-		failf("%q is not an interface", *target)
+		failf("%q is not an interface", target)
 	}
 
 	if iface.NumEmbeddeds() > 0 {
-		failf("target interface %q has embedded interfaces; not supported", *target)
+		failf("interface %q has embedded interfaces; not supported", target)
 	}
+	return iface
+}
 
-	// Qualifier for type printing: if a type is from the same package, omit package prefix
+func collectMethods(pkg *packages.Package, iface *types.Interface) ([]methodMeta, []importMeta) {
 	qualifier := func(other *types.Package) string {
-		if other == nil {
-			return ""
-		}
-		if other.Path() == pkg.Types.Path() {
-			// same package, no qualifier
+		if other == nil || other.Path() == pkg.Types.Path() {
 			return ""
 		}
 		return other.Name()
 	}
 
-	neededImports := map[string]string{}
-
+	imports := map[string]string{}
 	var methods []methodMeta
+
 	for i := 0; i < iface.NumMethods(); i++ {
 		m := iface.Method(i)
 		sig, ok := m.Type().(*types.Signature)
 		if !ok {
 			failf("method %s has no signature", m.Name())
 		}
-		params := sig.Params()
-		results := sig.Results()
 
-		if params.Len() != 2 {
-			failf("method %s: expected 2 parameters, got %d", m.Name(), params.Len())
-		}
-		first := params.At(0).Type().String()
-		if first != "context.Context" {
-			failf("method %s: first parameter must be context.Context, got %s", m.Name(), first)
-		}
-		reqTypeType := params.At(1).Type()
-		reqType := types.TypeString(reqTypeType, qualifier)
-		if named, ok := reqTypeType.(*types.Named); ok {
-			typePkg := named.Obj().Pkg()
-			if typePkg.Path() != pkg.Types.Path() {
-				neededImports[typePkg.Name()] = typePkg.Path()
-			}
-		}
-
-		if results.Len() != 2 {
-			failf("method %s: expected 2 results, got %d", m.Name(), results.Len())
-		}
-		if results.At(1).Type().String() != "error" {
-			failf("method %s: second result must be error, got %s", m.Name(), results.At(1).Type().String())
-		}
-		respTypeType := results.At(0).Type()
-		respType := types.TypeString(respTypeType, qualifier)
-		if named, ok := respTypeType.(*types.Named); ok {
-			typePkg := named.Obj().Pkg()
-			if typePkg.Path() != pkg.Types.Path() {
-				neededImports[typePkg.Name()] = typePkg.Path()
-			}
-		}
-
-		methods = append(methods, methodMeta{
-			Name:     m.Name(),
-			ReqType:  reqType,
-			RespType: respType,
-		})
+		validateParams(m, sig, qualifier, pkg)
+		methods = append(methods, buildMethodMeta(m, sig, qualifier, pkg, imports))
 	}
 
+	var importMetas []importMeta
+	for name, path := range imports {
+		importMetas = append(importMetas, importMeta{
+			Name: name,
+			Path: path,
+		})
+	}
+	return methods, importMetas
+}
+
+func validateParams(m *types.Func, sig *types.Signature, qualifier func(*types.Package) string, pkg *packages.Package) {
+	params := sig.Params()
+	if params.Len() != 2 {
+		failf("method %s: expected 2 parameters, got %d", m.Name(), params.Len())
+	}
+
+	if params.At(0).Type().String() != "context.Context" {
+		failf("method %s: first parameter must be context.Context", m.Name())
+	}
+
+	results := sig.Results()
+	if results.Len() != 2 {
+		failf("method %s: expected 2 results, got %d", m.Name(), results.Len())
+	}
+
+	if results.At(1).Type().String() != "error" {
+		failf("method %s: second result must be error", m.Name())
+	}
+}
+
+func buildMethodMeta(m *types.Func, sig *types.Signature,
+	qualifier func(*types.Package) string, pkg *packages.Package,
+	imports map[string]string,
+) methodMeta {
+	addImportIfExternal(sig.Params().At(1).Type(), pkg, qualifier, imports)
+	addImportIfExternal(sig.Results().At(0).Type(), pkg, qualifier, imports)
+
+	return methodMeta{
+		Name:     m.Name(),
+		ReqType:  types.TypeString(sig.Params().At(1).Type(), qualifier),
+		RespType: types.TypeString(sig.Results().At(0).Type(), qualifier),
+	}
+}
+
+func addImportIfExternal(t types.Type, pkg *packages.Package,
+	qualifier func(*types.Package) string, imports map[string]string,
+) {
+	if named, ok := t.(*types.Named); ok {
+		if typePkg := named.Obj().Pkg(); typePkg != nil && typePkg.Path() != pkg.Types.Path() {
+			imports[typePkg.Name()] = typePkg.Path()
+		}
+	}
+}
+
+func generateFiles(pkgName, target, outDir string, methods []methodMeta, imports []importMeta) {
 	clientFile := filepath.Join(outDir, "client.srpc.go")
 	serverFile := filepath.Join(outDir, "server.srpc.go")
 
-	if !fileExists(clientFile) {
-		src, err := generateClient(pkg.Name, *target, methods, neededImports)
-		if err != nil {
-			failf("generate client: %v", err)
-		}
-		if err := writeFormattedFile(clientFile, src); err != nil {
-			failf("writing client file: %v", err)
-		}
+	if tryGenerateFile(clientFile, func() ([]byte, error) {
+		return generateClient(pkgName, target, methods, imports)
+	}) {
 		fmt.Printf("wrote %s\n", clientFile)
 	} else {
 		fmt.Printf("skipping %s (already exists)\n", clientFile)
 	}
 
-	if !fileExists(serverFile) {
-		src, err := generateServer(pkg.Name, *target, methods, neededImports)
-		if err != nil {
-			failf("generate server: %v", err)
-		}
-		if err := writeFormattedFile(serverFile, src); err != nil {
-			failf("writing server file: %v", err)
-		}
+	if tryGenerateFile(serverFile, func() ([]byte, error) {
+		return generateServer(pkgName, target, methods, imports)
+	}) {
 		fmt.Printf("wrote %s\n", serverFile)
 	} else {
 		fmt.Printf("skipping %s (already exists)\n", serverFile)
 	}
 }
 
-func generateClient(pkgName, target string, methods []methodMeta, imports map[string]string) ([]byte, error) {
+func tryGenerateFile(path string, gen func() ([]byte, error)) bool {
+	if fileExists(path) {
+		return false
+	}
+	src, err := gen()
+	if err != nil {
+		failf("generate: %v", err)
+	}
+	if err := writeFormattedFile(path, src); err != nil {
+		failf("writing file: %v", err)
+	}
+	return true
+}
+
+func generateImports(b *bytes.Buffer, imports ...importMeta) {
+	fmt.Fprintf(b, "import (\n")
+	for _, i := range imports {
+		fmt.Fprintf(b, "%s\n", i.ImportString())
+	}
+	fmt.Fprintf(b, ")\n\n")
+}
+
+func generateClient(pkgName, target string, methods []methodMeta, imports []importMeta) ([]byte, error) {
 	var b bytes.Buffer
 
 	fmt.Fprintf(&b, "// Code generated by srpc-gen %s. DO NOT EDIT.\n\n", version)
 	fmt.Fprintf(&b, "package %s\n\n", pkgName)
 
-	fmt.Fprintf(&b, "import (\n\t\"context\"\n")
-	for name, path := range imports /* pass map into client too */ {
-		fmt.Fprintf(&b, "\t%s \"%s\"\n", name, path)
-	}
-	fmt.Fprintf(&b, "\t\"github.com/tymbaca/srpc\"\n)\n\n")
+	imports = append(imports, importPath("context"), importPath("github.com/tymbaca/srpc"))
+	generateImports(&b, imports...)
 
-	fmt.Fprintf(&b, "func New%sClient(client *srpc.Client) *%sClient {\n\treturn &%sClient{client: client}\n}\n\n", target, target, target)
+	fmt.Fprintf(&b, "func New%sClient(client *srpc.Client) *%sClient {\n\treturn &%sClient{client: client}\n}\n\n",
+		target, target, target)
 
 	fmt.Fprintf(&b, "type %sClient struct {\n\tclient *srpc.Client\n}\n\n", target)
 
@@ -182,31 +234,29 @@ func generateClient(pkgName, target string, methods []methodMeta, imports map[st
 		fmt.Fprintf(&b, "\terr = c.client.Call(ctx, \"%s.%s\", req, &resp)\n", target, m.Name)
 		fmt.Fprintf(&b, "\treturn resp, err\n}\n\n")
 	}
-
 	return b.Bytes(), nil
 }
 
-func generateServer(pkgName, target string, methods []methodMeta, imports map[string]string) ([]byte, error) {
+func importPath(s string) importMeta {
+	return importMeta{Path: s}
+}
+
+func generateServer(pkgName, target string, methods []methodMeta, imports []importMeta) ([]byte, error) {
 	var b bytes.Buffer
 
 	fmt.Fprintf(&b, "// Code generated by srpc-gen %s. Edit for your needs.\n\n", version)
 	fmt.Fprintf(&b, "package %s\n\n", pkgName)
 
-	// Print import block including context + all needed external packages
-	fmt.Fprintf(&b, "import (\n\t\"context\"\n")
-	for name, path := range imports /* need to pass this map into generateServer */ {
-		fmt.Fprintf(&b, "\t%s \"%s\"\n", name, path)
-	}
-	fmt.Fprintf(&b, ")\n\n")
+	imports = append(imports, importPath("context"))
+	generateImports(&b, imports...)
 
 	fmt.Fprintf(&b, "type %sServer struct {\n\t// TODO: fill\n}\n\n", target)
 
 	for _, m := range methods {
-		fmt.Fprintf(&b, "func (te *%sServer) %s(ctx context.Context, req %s) (%s, error) {\n",
+		fmt.Fprintf(&b, "func (s *%sServer) %s(ctx context.Context, req %s) (%s, error) {\n",
 			target, m.Name, m.ReqType, m.RespType)
 		fmt.Fprintf(&b, "\tpanic(\"not implemented\") // TODO: Implement\n}\n\n")
 	}
-
 	return b.Bytes(), nil
 }
 
@@ -215,10 +265,7 @@ func writeFormattedFile(path string, src []byte) error {
 	if err != nil {
 		return fmt.Errorf("format.Source failed: %w\nunformatted source:\n%s", err, string(src))
 	}
-	if err := os.WriteFile(path, fmtSrc, 0o644); err != nil {
-		return err
-	}
-	return nil
+	return os.WriteFile(path, fmtSrc, 0o644)
 }
 
 func fileExists(path string) bool {
