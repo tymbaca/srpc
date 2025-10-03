@@ -4,19 +4,24 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"reflect"
 	"sync/atomic"
 
+	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
-func NewServer(codec Codec) *Server {
+func NewServer(codec Codec, opts ...ServerOption) *Server {
 	s := &Server{
 		services: make(map[string]service),
 		codec:    codec,
+		logger:   logger.NoopLogger{},
 	}
 	s.closed.Store(false)
+
+	for _, o := range opts {
+		o(s)
+	}
 
 	return s
 }
@@ -27,6 +32,8 @@ type Server struct {
 
 	l      Listener
 	closed atomic.Bool
+
+	logger logger.Logger
 }
 
 type service struct {
@@ -52,7 +59,6 @@ func RegisterWithName[T any](s *Server, impl T, name string) {
 	if name == "" {
 		name = t.Name()
 		if name == "" {
-			slog.Debug(`t.Name() was "", getting t.Elem().Name()`)
 			name = t.Elem().Name()
 		}
 	}
@@ -78,14 +84,14 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 
 		conn, err := s.l.Accept()
 		if err != nil {
-			slog.Error(err.Error())
+			s.logger.Error(err.Error())
 			continue
 		}
 
 		go func() {
 			err := s.handleConn(ctx, conn)
 			if err != nil {
-				slog.Error(err.Error())
+				s.logger.Error(err.Error())
 			}
 		}()
 	}

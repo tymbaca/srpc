@@ -36,20 +36,19 @@ func TestHttpTransport(t *testing.T) {
 }
 
 func BenchmarkHttpTransport(b *testing.B) {
-	// goleak.IgnoreTopFunction
-	defer goleak.VerifyNone(b)
-	// ctx := b.Context()
+	defer goleak.VerifyNone(b, goleak.IgnoreCurrent())
+	ctx := b.Context()
 
 	b.Run("single client", func(b *testing.B) {
-		// server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON))
-		// defer server.Close()
-		// go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
+		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON))
+		defer server.Close()
+		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 
-		// client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
-		// for b.Loop() {
-		// 	resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
-		// 	require.NoError(b, err)
-		// 	require.Equal(b, 25, resp.Result)
-		// }
+		client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+		for b.Loop() {
+			resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
+			require.NoError(b, err)
+			require.Equal(b, 25, resp.Result)
+		}
 	})
 }
