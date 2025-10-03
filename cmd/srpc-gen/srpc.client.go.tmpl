@@ -3,11 +3,12 @@
 package {{ .PkgName }}
 
 import (
+	"context"
+	"github.com/tymbaca/srpc"
+
 {{- range .Imports }}
 	{{ .ImportString }}
 {{- end }}
-	"context"
-	"github.com/tymbaca/srpc"
 )
 
 func New{{ .Target }}Client(client *srpc.Client) *{{ .Target }}Client {

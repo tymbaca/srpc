@@ -3,14 +3,32 @@
 package {{ .PkgName }}
 
 import (
+	"context"
+	"github.com/tymbaca/srpc"
+
 {{- range .Imports }}
 	{{ .ImportString }}
 {{- end }}
-	"context"
 )
 
+func New{{ .Target }}Server(
+    s *srpc.Server,
+    // TODO: Fill
+) *{{ .Target }}Server {
+	svc := &{{ .Target }}Server{
+        Server: s,
+        // TODO: Fill
+    }
+
+	srpc.Register[{{ .Target }}](s, svc)
+
+    return svc
+}
+
 type {{ .Target }}Server struct {
-	// TODO: fill
+	*srpc.Server
+
+	// TODO: Fill
 }
 
 {{- range .Methods }}
