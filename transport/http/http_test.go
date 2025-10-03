@@ -8,12 +8,14 @@ import (
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/transport/http/testdata"
+	"go.uber.org/goleak"
 )
 
 func TestHttpTransport(t *testing.T) {
 	ctx := t.Context()
 
 	server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON))
+	defer server.Close()
 	go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 
 	client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
@@ -34,12 +36,14 @@ func TestHttpTransport(t *testing.T) {
 }
 
 func BenchmarkHttpTransport(b *testing.B) {
-	ctx := b.Context()
+	// goleak.IgnoreTopFunction
+	defer goleak.VerifyNone(b)
+	// ctx := b.Context()
 
 	b.Run("single client", func(b *testing.B) {
-		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON))
-		defer server.Close()
-		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
+		// server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON))
+		// defer server.Close()
+		// go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 
 		// client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
 		// for b.Loop() {

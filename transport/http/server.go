@@ -10,14 +10,12 @@ import (
 	"sync"
 
 	"github.com/tymbaca/srpc"
-	"github.com/tymbaca/srpc/pkg/atomic"
 )
 
 var ErrListenerClosed = errors.New("listener is closed")
 
 type Listener struct {
-	server    http.Server
-	serverErr atomic.Value[error]
+	server http.Server
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -36,8 +34,8 @@ func CreateAndStartListener(addr string, path string, method string) *Listener {
 func NewServerListener(addr string, path string, method string) *Listener {
 	l := &Listener{
 		server: http.Server{Addr: addr},
+		conns:  make(chan srpc.ServerConn),
 	}
-	l.conns = make(chan srpc.ServerConn)
 	l.ctx, l.ctxCancel = context.WithCancel(context.Background())
 
 	mux := http.NewServeMux()
@@ -47,14 +45,10 @@ func NewServerListener(addr string, path string, method string) *Listener {
 	return l
 }
 
-func (l *Listener) Start() {
+func (l *Listener) Start() error {
 	defer l.Close()
 
-	err := l.server.ListenAndServe()
-	if err != nil {
-		l.serverErr.Store(err)
-		return
-	}
+	return l.server.ListenAndServe()
 }
 
 // Close closes the listener.
@@ -79,10 +73,6 @@ func (l *Listener) Accept() (srpc.ServerConn, error) {
 		}
 		return conn, nil
 	case <-l.ctx.Done():
-		if err := l.serverErr.Load(); err != nil {
-			return nil, err
-		}
-
 		return nil, ErrListenerClosed
 	}
 }

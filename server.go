@@ -6,8 +6,8 @@ import (
 	"io"
 	"log/slog"
 	"reflect"
+	"sync/atomic"
 
-	"github.com/tymbaca/srpc/pkg/atomic"
 	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
@@ -26,7 +26,7 @@ type Server struct {
 	services map[string]service
 
 	l      Listener
-	closed atomic.Value[bool]
+	closed atomic.Bool
 }
 
 type service struct {
@@ -79,6 +79,7 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 		conn, err := s.l.Accept()
 		if err != nil {
 			slog.Error(err.Error())
+			continue
 		}
 
 		go func() {
