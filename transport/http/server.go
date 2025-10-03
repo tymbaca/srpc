@@ -37,6 +37,8 @@ func NewServerListener(addr string, path string, method string) *Listener {
 	l := &Listener{
 		server: http.Server{Addr: addr},
 	}
+	l.conns = make(chan srpc.ServerConn)
+	l.ctx, l.ctxCancel = context.WithCancel(context.Background())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc(fmt.Sprintf("%s %s", method, path), l.handler)
@@ -46,8 +48,6 @@ func NewServerListener(addr string, path string, method string) *Listener {
 }
 
 func (l *Listener) Start() {
-	l.conns = make(chan srpc.ServerConn)
-	l.ctx, l.ctxCancel = context.WithCancel(context.Background())
 	defer l.Close()
 
 	err := l.server.ListenAndServe()
