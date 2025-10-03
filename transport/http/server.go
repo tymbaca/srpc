@@ -2,7 +2,6 @@ package httptransport
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -11,8 +10,6 @@ import (
 
 	"github.com/tymbaca/srpc"
 )
-
-var ErrListenerClosed = errors.New("listener is closed")
 
 type Listener struct {
 	server http.Server
@@ -65,6 +62,8 @@ func (l *Listener) close() error {
 }
 
 // Accept waits and returns new connection to the listener.
+// If Listener got closed Accept must return [ErrListenerClosed],
+// including Accept calls that didn't returned yet.
 func (l *Listener) Accept() (srpc.ServerConn, error) {
 	select {
 	case conn, open := <-l.conns:
@@ -73,7 +72,7 @@ func (l *Listener) Accept() (srpc.ServerConn, error) {
 		}
 		return conn, nil
 	case <-l.ctx.Done():
-		return nil, ErrListenerClosed
+		return nil, srpc.ErrListenerClosed
 	}
 }
 

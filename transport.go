@@ -1,6 +1,9 @@
 package srpc
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 type Connector interface {
 	Connect(ctx context.Context, addr string) (ClientConn, error)
@@ -13,8 +16,12 @@ type ClientConn interface {
 	Close() error
 }
 
+var ErrListenerClosed = errors.New("listener is closed")
+
 type Listener interface {
 	// Accept waits and returns new connection to the listener.
+	// If Listener got closed Accept must return [ErrListenerClosed],
+	// including Accept calls that didn't returned yet.
 	Accept() (ServerConn, error)
 
 	// Close closes the listener.

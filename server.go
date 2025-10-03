@@ -2,10 +2,10 @@ package srpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
-	"sync/atomic"
 
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/pkg/pipe"
@@ -17,7 +17,6 @@ func NewServer(codec Codec, opts ...ServerOption) *Server {
 		codec:    codec,
 		logger:   logger.NoopLogger{},
 	}
-	s.closed.Store(false)
 
 	for _, o := range opts {
 		o(s)
@@ -30,8 +29,7 @@ type Server struct {
 	codec    Codec
 	services map[string]service
 
-	l      Listener
-	closed atomic.Bool
+	l Listener
 
 	logger logger.Logger
 }
@@ -77,12 +75,15 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 	s.l = l
 	defer s.Close()
 
-	for !s.closed.Load() {
+	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
 		conn, err := s.l.Accept()
+		if errors.Is(err, ErrListenerClosed) {
+			return nil
+		}
 		if err != nil {
 			s.logger.Error(err.Error())
 			continue
@@ -95,12 +96,9 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 			}
 		}()
 	}
-
-	return nil
 }
 
 func (s *Server) Close() error {
-	s.closed.Store(true)
 	if s.l != nil {
 		return s.l.Close()
 	}
