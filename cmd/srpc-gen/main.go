@@ -116,6 +116,7 @@ func main() {
 	iface := loadTargetInterface(pkg, *target)
 
 	methods, imports := collectMethods(pkg, iface)
+	fmt.Printf("imports: %v\n", imports)
 
 	generateFiles(pkg.Name, *target, outDir, methods, imports, *only, *clientOut, *serverOut)
 }
@@ -256,7 +257,7 @@ func collectMethods(pkg *packages.Package, iface *types.Interface) ([]methodMeta
 			failf("method %s has no signature", m.Name())
 		}
 
-		validateParams(m, sig, qualifier, pkg)
+		validateParams(m, sig)
 		methods = append(methods, buildMethodMeta(m, sig, qualifier, pkg, imports))
 	}
 
@@ -270,7 +271,7 @@ func collectMethods(pkg *packages.Package, iface *types.Interface) ([]methodMeta
 	return methods, importMetas
 }
 
-func validateParams(m *types.Func, sig *types.Signature, qualifier func(*types.Package) string, pkg *packages.Package) {
+func validateParams(m *types.Func, sig *types.Signature) {
 	params := sig.Params()
 	if params.Len() != 2 {
 		failf("method %s: expected 2 parameters, got %d", m.Name(), params.Len())
@@ -294,8 +295,8 @@ func buildMethodMeta(m *types.Func, sig *types.Signature,
 	qualifier func(*types.Package) string, pkg *packages.Package,
 	imports map[string]string,
 ) methodMeta {
-	addImportIfExternal(sig.Params().At(1).Type(), pkg, qualifier, imports)
-	addImportIfExternal(sig.Results().At(0).Type(), pkg, qualifier, imports)
+	addImportIfExternal(sig.Params().At(1).Type(), pkg, imports)
+	addImportIfExternal(sig.Results().At(0).Type(), pkg, imports)
 
 	return methodMeta{
 		Name:     m.Name(),
@@ -304,8 +305,7 @@ func buildMethodMeta(m *types.Func, sig *types.Signature,
 	}
 }
 
-func addImportIfExternal(t types.Type, pkg *packages.Package,
-	qualifier func(*types.Package) string, imports map[string]string,
+func addImportIfExternal(t types.Type, pkg *packages.Package, imports map[string]string,
 ) {
 	if named, ok := t.(*types.Named); ok {
 		if typePkg := named.Obj().Pkg(); typePkg != nil && typePkg.Path() != pkg.Types.Path() {
@@ -325,10 +325,6 @@ func getOutDir() string {
 		return dir
 	}
 	return "."
-}
-
-func importPath(s string) importMeta {
-	return importMeta{Path: s}
 }
 
 func writeFormattedFile(path string, src []byte) error {

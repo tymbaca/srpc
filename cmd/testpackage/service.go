@@ -2,8 +2,12 @@ package testpackage
 
 import (
 	"context"
+	"net/http"
 
+	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/cmd/testpackage/inner"
+	"github.com/tymbaca/srpc/codec"
+	httptransport "github.com/tymbaca/srpc/transport/http"
 )
 
 type (
@@ -36,13 +40,13 @@ type TestService2 interface {
 	Multiply(ctx context.Context, req inner.MultiplyReq) (inner.MultiplyResp, error)
 }
 
-// func exampleServer() {
-// 	ctx := context.Background()
-// 	err := NewTestServiceServer(codec.JSON).Start(ctx, httptransport.CreateAndStartListener(":8080", "/srpc", http.MethodPost))
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// }
+func exampleServer() {
+	ctx := context.Background()
+	err := NewTestServiceExpServer(srpc.NewServer(codec.JSON)).Start(ctx, httptransport.CreateAndStartListener(":8080", "/srpc", http.MethodPost))
+	if err != nil {
+		panic(err)
+	}
+}
 
 // func exampleClient() {
 // 	ctx := context.Background()
