@@ -2,7 +2,7 @@ package srpc
 
 import "context"
 
-type ClientConnector interface {
+type Connector interface {
 	Connect(ctx context.Context, addr string) (ClientConn, error)
 }
 
@@ -13,7 +13,7 @@ type ClientConn interface {
 	Close() error
 }
 
-type ServerListener interface {
+type Listener interface {
 	// Accept waits for and returns the next connection to the listener.
 	Accept() (ServerConn, error)
 

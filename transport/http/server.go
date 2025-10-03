@@ -5,20 +5,27 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"sync"
 
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/pkg/atomic"
 )
 
-type ServerListener struct {
+var ErrListenerClosed = errors.New("listener is closed")
+
+type Listener struct {
 	server    http.Server
 	serverErr atomic.Value[error]
 
-	conns chan srpc.ServerConn
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+	closeOnce sync.Once
+	conns     chan srpc.ServerConn
 }
 
-func CreateAndStartListener(addr string, path string, method string) *ServerListener {
+func CreateAndStartListener(addr string, path string, method string) *Listener {
 	l := NewServerListener(addr, path, method)
 	go l.Start()
 	return l
@@ -26,8 +33,8 @@ func CreateAndStartListener(addr string, path string, method string) *ServerList
 
 // FIX: disallow methods without body
 
-func NewServerListener(addr string, path string, method string) *ServerListener {
-	l := &ServerListener{
+func NewServerListener(addr string, path string, method string) *Listener {
+	l := &Listener{
 		server: http.Server{Addr: addr},
 	}
 
@@ -38,9 +45,10 @@ func NewServerListener(addr string, path string, method string) *ServerListener 
 	return l
 }
 
-func (l *ServerListener) Start() {
+func (l *Listener) Start() {
 	l.conns = make(chan srpc.ServerConn)
-	defer close(l.conns)
+	l.ctx, l.ctxCancel = context.WithCancel(context.Background())
+	defer l.Close()
 
 	err := l.server.ListenAndServe()
 	if err != nil {
@@ -49,7 +57,19 @@ func (l *ServerListener) Start() {
 	}
 }
 
-func (l *ServerListener) handler(w http.ResponseWriter, r *http.Request) {
+// Close closes the listener.
+// Any blocked Accept operations will be unblocked and return errors.
+func (l *Listener) Close() (err error) {
+	l.closeOnce.Do(func() { err = l.close() })
+	return err
+}
+
+func (l *Listener) close() error {
+	l.ctxCancel()
+	return l.server.Close()
+}
+
+func (l *Listener) handler(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if r.Body != nil {
 			r.Body.Close()
@@ -74,29 +94,34 @@ func (l *ServerListener) handler(w http.ResponseWriter, r *http.Request) {
 		closeHandlerCh: make(chan struct{}),
 	}
 
-	// FIX: may be closed
-	l.conns <- conn
-	<-conn.closeHandlerCh // wait until srpc handles the connection and calls [serverConn.Close]
+	// pass connection to Accept()
+	select {
+	case l.conns <- conn:
+	case <-l.ctx.Done():
+	}
+
+	// wait until srpc handles the connection and calls [serverConn.Close]
+	select {
+	case <-conn.closeHandlerCh:
+	case <-l.ctx.Done():
+	}
 }
 
 // Accept waits for and returns the next connection to the listener.
-func (l *ServerListener) Accept() (srpc.ServerConn, error) {
-	conn, open := <-l.conns
-	if !open {
+func (l *Listener) Accept() (srpc.ServerConn, error) {
+	select {
+	case conn, open := <-l.conns:
+		if !open {
+			log.Panicf("http listener: l.conns was closed, but it must not happen")
+		}
+		return conn, nil
+	case <-l.ctx.Done():
 		if err := l.serverErr.Load(); err != nil {
 			return nil, err
 		}
 
-		return nil, errors.New("listener is closed")
+		return nil, ErrListenerClosed
 	}
-
-	return conn, nil
-}
-
-// Close closes the listener.
-// Any blocked Accept operations will be unblocked and return errors.
-func (l *ServerListener) Close() error {
-	return l.server.Close()
 }
 
 type serverConn struct {

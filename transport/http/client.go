@@ -11,41 +11,41 @@ import (
 	"github.com/tymbaca/srpc"
 )
 
-func NewClientConnector(path string, method string) srpc.ClientConnector {
-	return &ClientConnector{
+func NewClientConnector(path string, method string) srpc.Connector {
+	return &Connector{
 		path:   path,
 		method: method,
 		client: &http.Client{},
 	}
 }
 
-type ClientConnector struct {
+type Connector struct {
 	path   string
 	method string
 	client *http.Client
 }
 
-func (cl *ClientConnector) Connect(ctx context.Context, addr string) (srpc.ClientConn, error) {
+func (cl *Connector) Connect(ctx context.Context, addr string) (srpc.ClientConn, error) {
 	url, err := url.JoinPath(addr, cl.path)
 	if err != nil {
 		return nil, fmt.Errorf("create url to connect via http: %w", err)
 	}
 
-	return &ClientConn{
+	return &clientConn{
 		url:    url,
 		method: cl.method,
 		client: cl.client,
 	}, nil
 }
 
-type ClientConn struct {
+type clientConn struct {
 	url    string
 	method string
 	client *http.Client
 	close  func() error
 }
 
-func (cl *ClientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response, error) {
+func (cl *clientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, cl.method, cl.url, req.Body)
 	if err != nil {
 		return srpc.Response{}, fmt.Errorf("create http request: %w", err)
@@ -102,6 +102,6 @@ func (cl *ClientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response
 }
 
 // Close must be called after Send
-func (cl *ClientConn) Close() error {
+func (cl *clientConn) Close() error {
 	return cl.close()
 }

@@ -22,7 +22,7 @@ type Server struct {
 	codec    Codec
 	services map[string]service
 
-	l      ServerListener
+	l      Listener
 	closed atomic.Value[bool]
 }
 
@@ -64,7 +64,7 @@ func RegisterWithName[T any](s *Server, impl T, name string) {
 	s.services[name] = service
 }
 
-func (s *Server) Start(ctx context.Context, l ServerListener) error {
+func (s *Server) Start(ctx context.Context, l Listener) error {
 	s.closed.Store(false)
 	s.l = l
 	defer s.l.Close()
