@@ -14,11 +14,12 @@ type ClientConn interface {
 }
 
 type Listener interface {
-	// Accept waits for and returns the next connection to the listener.
+	// Accept waits and returns new connection to the listener.
 	Accept() (ServerConn, error)
 
 	// Close closes the listener.
 	// Any blocked Accept operations will be unblocked and return errors.
+	// Close can be called multiple times.
 	Close() error
 }
 

@@ -59,6 +59,7 @@ func (l *Listener) Start() {
 
 // Close closes the listener.
 // Any blocked Accept operations will be unblocked and return errors.
+// Close can be called multiple times.
 func (l *Listener) Close() (err error) {
 	l.closeOnce.Do(func() { err = l.close() })
 	return err
@@ -67,6 +68,23 @@ func (l *Listener) Close() (err error) {
 func (l *Listener) close() error {
 	l.ctxCancel()
 	return l.server.Close()
+}
+
+// Accept waits and returns new connection to the listener.
+func (l *Listener) Accept() (srpc.ServerConn, error) {
+	select {
+	case conn, open := <-l.conns:
+		if !open {
+			log.Panicf("http listener: l.conns was closed, but it must not happen")
+		}
+		return conn, nil
+	case <-l.ctx.Done():
+		if err := l.serverErr.Load(); err != nil {
+			return nil, err
+		}
+
+		return nil, ErrListenerClosed
+	}
 }
 
 func (l *Listener) handler(w http.ResponseWriter, r *http.Request) {
@@ -104,23 +122,6 @@ func (l *Listener) handler(w http.ResponseWriter, r *http.Request) {
 	select {
 	case <-conn.closeHandlerCh:
 	case <-l.ctx.Done():
-	}
-}
-
-// Accept waits for and returns the next connection to the listener.
-func (l *Listener) Accept() (srpc.ServerConn, error) {
-	select {
-	case conn, open := <-l.conns:
-		if !open {
-			log.Panicf("http listener: l.conns was closed, but it must not happen")
-		}
-		return conn, nil
-	case <-l.ctx.Done():
-		if err := l.serverErr.Load(); err != nil {
-			return nil, err
-		}
-
-		return nil, ErrListenerClosed
 	}
 }
 

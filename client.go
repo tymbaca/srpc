@@ -9,8 +9,10 @@ import (
 	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
-var ErrServiceError = errors.New("service error")
-var ErrTransportError = errors.New("transport error")
+var (
+	ErrServiceError   = errors.New("service error")
+	ErrTransportError = errors.New("transport error")
+)
 
 func NewClient(addr string, codec Codec, connector Connector) *Client {
 	return &Client{
@@ -27,6 +29,8 @@ type Client struct {
 }
 
 // TODO: check metadata in context
+// TODO: timeouts? > but we support context
+
 func (c *Client) Call(ctx context.Context, serviceMethod ServiceMethod, req any, resp any) error {
 	conn, err := c.connector.Connect(ctx, c.addr)
 	if err != nil {

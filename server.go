@@ -12,10 +12,13 @@ import (
 )
 
 func NewServer(codec Codec) *Server {
-	return &Server{
+	s := &Server{
 		services: make(map[string]service),
 		codec:    codec,
 	}
+	s.closed.Store(false)
+
+	return s
 }
 
 type Server struct {
@@ -65,9 +68,8 @@ func RegisterWithName[T any](s *Server, impl T, name string) {
 }
 
 func (s *Server) Start(ctx context.Context, l Listener) error {
-	s.closed.Store(false)
 	s.l = l
-	defer s.l.Close()
+	defer s.Close()
 
 	for !s.closed.Load() {
 		if err := ctx.Err(); err != nil {
@@ -92,7 +94,11 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 
 func (s *Server) Close() error {
 	s.closed.Store(true)
-	return s.l.Close()
+	if s.l != nil {
+		return s.l.Close()
+	}
+
+	return nil
 }
 
 func (s *Server) handleConn(ctx context.Context, conn ServerConn) (err error) {
