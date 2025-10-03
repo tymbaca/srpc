@@ -4,7 +4,6 @@ package testpackage
 
 import (
 	"context"
-
 	"github.com/tymbaca/srpc/cmd/testpackage/inner"
 )
 
