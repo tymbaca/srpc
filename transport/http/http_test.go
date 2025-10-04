@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tymbaca/srpc"
@@ -12,6 +13,10 @@ import (
 	"github.com/tymbaca/srpc/transport/http/testdata"
 	"go.uber.org/goleak"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
 
 func TestHttpTransport(t *testing.T) {
 	ctx := t.Context()
@@ -38,7 +43,7 @@ func TestHttpTransport(t *testing.T) {
 }
 
 func BenchmarkHttpTransport(b *testing.B) {
-	defer goleak.VerifyNone(b, goleak.IgnoreCurrent())
+	defer time.Sleep(2 * time.Second)
 	ctx := b.Context()
 
 	b.Run("single client", func(b *testing.B) {
@@ -74,7 +79,7 @@ func BenchmarkHttpTransport(b *testing.B) {
 
 		for b.Loop() {
 			var wg sync.WaitGroup
-			for range 1000 {
+			for range 100 {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
@@ -93,21 +98,19 @@ func BenchmarkHttpTransport(b *testing.B) {
 		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 		defer server.Close()
 
-		for b.Loop() {
-			var wg sync.WaitGroup
-			for range 10 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
-					for range 10 {
-						resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
-						require.NoError(b, err)
-						require.Equal(b, 25, resp.Result)
-					}
-				}()
-			}
-			wg.Wait()
+		var wg sync.WaitGroup
+		for range 10 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+				for b.Loop() {
+					resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
+					require.NoError(b, err)
+					require.Equal(b, 25, resp.Result)
+				}
+			}()
 		}
+		wg.Wait()
 	})
 }

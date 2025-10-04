@@ -8,19 +8,19 @@ import (
 )
 
 func NewTestServiceClient(client *srpc.Client) *TestServiceClient {
-	return &TestServiceClient{client: client}
+	return &TestServiceClient{Client: client}
 }
 
 type TestServiceClient struct {
-	client *srpc.Client
+	*srpc.Client
 }
 
 func (c *TestServiceClient) Add(ctx context.Context, req AddReq) (resp AddResp, err error) {
-	err = c.client.Call(ctx, "TestService.Add", req, &resp)
+	err = c.Client.Call(ctx, "TestService.Add", req, &resp)
 	return resp, err
 }
 
 func (c *TestServiceClient) Divide(ctx context.Context, req DivideReq) (resp DivideResp, err error) {
-	err = c.client.Call(ctx, "TestService.Divide", req, &resp)
+	err = c.Client.Call(ctx, "TestService.Divide", req, &resp)
 	return resp, err
 }

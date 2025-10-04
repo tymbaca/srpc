@@ -1,3 +1,3 @@
-gengen:
+gen:
 	go install ./cmd/srpc-gen
 	go generate ./...

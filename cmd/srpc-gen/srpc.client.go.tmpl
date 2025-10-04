@@ -12,17 +12,17 @@ import (
 )
 
 func New{{ .Target }}Client(client *srpc.Client) *{{ .Target }}Client {
-	return &{{ .Target }}Client{client: client}
+	return &{{ .Target }}Client{Client: client}
 }
 
 type {{ .Target }}Client struct {
-	client *srpc.Client
+	*srpc.Client
 }
 
 {{- range .Methods }}
 
 func (c *{{ $.Target }}Client) {{ .Name }}(ctx context.Context, req {{ .ReqType }}) (resp {{ .RespType }}, err error) {
-	err = c.client.Call(ctx, "{{ $.Target }}.{{ .Name }}", req, &resp)
+	err = c.Client.Call(ctx, "{{ $.Target }}.{{ .Name }}", req, &resp)
 	return resp, err
 }
 {{- end }} 
