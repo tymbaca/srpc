@@ -112,22 +112,22 @@ func (s *Server) handleConn(ctx context.Context, conn ServerConn) (err error) {
 
 	serviceName, methodName, ok := req.ServiceMethod.Split()
 	if !ok {
-		return conn.Send(ctx, respError(req, StatusInvalidServiceMethod, ""))
+		return conn.Reply(ctx, respError(req, StatusInvalidServiceMethod, ""))
 	}
 
 	service, ok := s.services[serviceName]
 	if !ok {
-		return conn.Send(ctx, respError(req, StatusServiceNotFound, ""))
+		return conn.Reply(ctx, respError(req, StatusServiceNotFound, ""))
 	}
 
 	method, ok := service.methods[methodName]
 	if !ok {
-		return conn.Send(ctx, respError(req, StatusMethodNotFound, ""))
+		return conn.Reply(ctx, respError(req, StatusMethodNotFound, ""))
 	}
 
 	resp := s.call(method, ctx, req)
 
-	return conn.Send(ctx, resp)
+	return conn.Reply(ctx, resp)
 }
 
 func (s *Server) call(m method, ctx context.Context, req Request) Response {

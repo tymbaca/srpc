@@ -131,7 +131,7 @@ func (c *serverConn) Addr() string {
 	return c.r.RemoteAddr
 }
 
-func (c *serverConn) Send(ctx context.Context, resp srpc.Response) error {
+func (c *serverConn) Reply(ctx context.Context, resp srpc.Response) error {
 	header, err := toHeader(resp.ServiceMethod, resp.Metadata)
 	if err != nil {
 		return fmt.Errorf("encode resp header: %w", err)

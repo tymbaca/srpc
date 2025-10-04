@@ -10,7 +10,7 @@ type Connector interface {
 }
 
 type ClientConn interface {
-	Send(ctx context.Context, req Request) (Response, error)
+	Do(ctx context.Context, req Request) (Response, error)
 
 	// Close must be called after Send
 	Close() error
@@ -33,7 +33,7 @@ type Listener interface {
 type ServerConn interface {
 	Request() Request
 	Addr() string
-	Send(ctx context.Context, resp Response) error
+	Reply(ctx context.Context, resp Response) error
 
 	// Close must be called after Send
 	Close() error

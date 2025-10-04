@@ -37,7 +37,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod ServiceMethod, req any,
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
 
-	connResp, err := conn.Send(ctx, Request{
+	connResp, err := conn.Do(ctx, Request{
 		ServiceMethod: serviceMethod,
 		Metadata:      Metadata{}, // TODO:
 		Body:          pipe.ToReader(func(w io.Writer) error { return c.codec.Encode(w, req) }),

@@ -45,7 +45,7 @@ type clientConn struct {
 	close  func() error
 }
 
-func (cl *clientConn) Send(ctx context.Context, req srpc.Request) (srpc.Response, error) {
+func (cl *clientConn) Do(ctx context.Context, req srpc.Request) (srpc.Response, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, cl.method, cl.url, req.Body)
 	if err != nil {
 		return srpc.Response{}, fmt.Errorf("create http request: %w", err)
