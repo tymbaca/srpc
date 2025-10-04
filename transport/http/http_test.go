@@ -99,18 +99,20 @@ func BenchmarkHttpTransport(b *testing.B) {
 		defer server.Close()
 
 		var wg sync.WaitGroup
-		for range 10 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
-				for b.Loop() {
-					resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
-					require.NoError(b, err)
-					require.Equal(b, 25, resp.Result)
-				}
-			}()
+		for b.Loop() {
+			for range 10 {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+					for range 10 {
+						resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
+						require.NoError(b, err)
+						require.Equal(b, 25, resp.Result)
+					}
+				}()
+			}
+			wg.Wait()
 		}
-		wg.Wait()
 	})
 }
