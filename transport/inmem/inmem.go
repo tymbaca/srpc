@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"math"
 	"sync"
 
@@ -29,7 +30,10 @@ func (c *Cluster) NewPeer() *Peer {
 	defer c.mu.Unlock()
 
 	addr := c.nextAddr()
-	peer := &Peer{cluster: c, addr: addr}
+	peer := &Peer{
+		cluster: c, addr: addr,
+		inbox: make(chan *conn),
+	}
 
 	c.peers[addr] = peer
 
@@ -60,13 +64,15 @@ type Peer struct {
 
 func (p *Peer) Listen() *peerListener {
 	l := &peerListener{
-		inbox: p.inbox,
+		parent: p,
+		inbox:  p.inbox,
 	}
 	l.ctx, l.cancel = context.WithCancel(context.Background())
 	return l
 }
 
 type peerListener struct {
+	parent *Peer // for debug purposes
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -77,6 +83,8 @@ type peerListener struct {
 // If Listener got closed Accept must return [ErrListenerClosed],
 // including Accept calls that didn't returned yet.
 func (pl *peerListener) Accept() (srpc.ServerConn, error) {
+	debug("wait for conn on inbox, peer: %+v", pl.parent)
+
 	select {
 	case <-pl.ctx.Done():
 		return nil, srpc.ErrListenerClosed
@@ -125,6 +133,8 @@ func (c *conn) Do(ctx context.Context, req srpc.Request) (srpc.Response, error) 
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	defer c.cancel()
 
+	debug("wait send conn to target inbox, me: %+v, target: %+v", c.client, c.server)
+
 	select {
 	case <-c.ctx.Done():
 		return srpc.Response{}, ctx.Err()
@@ -163,4 +173,12 @@ func (c *conn) Close() error {
 	}
 
 	return nil
+}
+
+const _debug = true
+
+func debug(format string, args ...any) {
+	if _debug {
+		slog.Info(fmt.Sprintf(format, args...))
+	}
 }
