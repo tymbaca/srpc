@@ -1,7 +1,6 @@
-package httptransport
+package inmem
 
 import (
-	"net/http"
 	"sync"
 	"testing"
 
@@ -14,21 +13,21 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m,
-		goleak.IgnoreAnyFunction("net.(*sysDialer).dialParallel"),
-		goleak.IgnoreAnyFunction("net.(*sysDialer).dialParallel.func1"),
-		goleak.IgnoreAnyFunction("net.(*netFD).connect.func2"),
-	)
+	goleak.VerifyTestMain(m)
 }
 
-func TestHttpTransport(t *testing.T) {
+func TestInmemTransport(t *testing.T) {
 	ctx := t.Context()
+
+	cluster := New()
+	clientPeer := cluster.NewPeer()
+	serverPeer := cluster.NewPeer()
 
 	server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON))
 	defer server.Close()
-	go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
+	go server.Start(ctx, serverPeer.Listen())
 
-	client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+	client := testdata.NewTestServiceClient(srpc.NewClient(serverPeer.Addr(), codec.JSON, clientPeer))
 	{
 		resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
 		require.NoError(t, err)
@@ -49,11 +48,14 @@ func BenchmarkHttpTransport(b *testing.B) {
 	ctx := b.Context()
 
 	b.Run("single client", func(b *testing.B) {
+		cluster := New()
+		clientPeer := cluster.NewPeer()
+		serverPeer := cluster.NewPeer()
 		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
-		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 		defer server.Close()
+		go server.Start(ctx, serverPeer.Listen())
 
-		client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+		client := testdata.NewTestServiceClient(srpc.NewClient(serverPeer.Addr(), codec.JSON, clientPeer))
 		for b.Loop() {
 			resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
 			require.NoError(b, err)
@@ -62,12 +64,15 @@ func BenchmarkHttpTransport(b *testing.B) {
 	})
 
 	b.Run("multiple clients sequentual", func(b *testing.B) {
+		cluster := New()
+		clientPeer := cluster.NewPeer()
+		serverPeer := cluster.NewPeer()
 		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
-		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 		defer server.Close()
+		go server.Start(ctx, serverPeer.Listen())
 
 		for b.Loop() {
-			client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+			client := testdata.NewTestServiceClient(srpc.NewClient(serverPeer.Addr(), codec.JSON, clientPeer))
 			resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
 			require.NoError(b, err)
 			require.Equal(b, 25, resp.Result)
@@ -75,10 +80,12 @@ func BenchmarkHttpTransport(b *testing.B) {
 	})
 
 	b.Run("multiple clients parallel", func(b *testing.B) {
-		b.Skip("flickery, now my fault")
+		cluster := New()
+		clientPeer := cluster.NewPeer()
+		serverPeer := cluster.NewPeer()
 		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
-		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 		defer server.Close()
+		go server.Start(ctx, serverPeer.Listen())
 
 		for b.Loop() {
 			var wg sync.WaitGroup
@@ -86,7 +93,7 @@ func BenchmarkHttpTransport(b *testing.B) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+					client := testdata.NewTestServiceClient(srpc.NewClient(serverPeer.Addr(), codec.JSON, clientPeer))
 					resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
 					require.NoError(b, err)
 					require.Equal(b, 25, resp.Result)
@@ -97,10 +104,12 @@ func BenchmarkHttpTransport(b *testing.B) {
 	})
 
 	b.Run("multiple clients parallel each multiple calls", func(b *testing.B) {
-		b.Skip("flickery, now my fault")
+		cluster := New()
+		clientPeer := cluster.NewPeer()
+		serverPeer := cluster.NewPeer()
 		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
-		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 		defer server.Close()
+		go server.Start(ctx, serverPeer.Listen())
 
 		var wg sync.WaitGroup
 		for b.Loop() {
@@ -108,7 +117,7 @@ func BenchmarkHttpTransport(b *testing.B) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+					client := testdata.NewTestServiceClient(srpc.NewClient(serverPeer.Addr(), codec.JSON, clientPeer))
 					for range 10 {
 						resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
 						require.NoError(b, err)
