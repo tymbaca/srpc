@@ -1,6 +1,7 @@
 package httptransport
 
 import (
+	"math/rand/v2"
 	"net/http"
 	"sync"
 	"testing"
@@ -45,78 +46,55 @@ func TestHttpTransport(t *testing.T) {
 	}
 }
 
-func BenchmarkHttpTransport(b *testing.B) {
-	ctx := b.Context()
+func TestHttpTransportStress(t *testing.T) {
+	ctx := t.Context()
 
-	b.Run("single client", func(b *testing.B) {
+	t.Run("single client", func(t *testing.T) {
 		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
 		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 		defer server.Close()
 
 		client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
-		for b.Loop() {
-			resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
-			require.NoError(b, err)
-			require.Equal(b, 25, resp.Result)
-		}
+		resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
+		require.NoError(t, err)
+		require.Equal(t, 25, resp.Result)
 	})
 
-	b.Run("multiple clients sequentual", func(b *testing.B) {
-		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
-		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
-		defer server.Close()
-
-		for b.Loop() {
-			client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
-			resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
-			require.NoError(b, err)
-			require.Equal(b, 25, resp.Result)
-		}
-	})
-
-	b.Run("multiple clients parallel", func(b *testing.B) {
-		b.Skip("flickery, now my fault")
-		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
-		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
-		defer server.Close()
-
-		for b.Loop() {
-			var wg sync.WaitGroup
-			for range 100 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
-					resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
-					require.NoError(b, err)
-					require.Equal(b, 25, resp.Result)
-				}()
-			}
-			wg.Wait()
-		}
-	})
-
-	b.Run("multiple clients parallel each multiple calls", func(b *testing.B) {
-		b.Skip("flickery, now my fault")
+	t.Run("multiple clients parallel each multiple calls", func(t *testing.T) {
+		t.Skip("flickery, now my fault")
 		server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
 		go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
 		defer server.Close()
 
 		var wg sync.WaitGroup
-		for b.Loop() {
-			for range 10 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
-					for range 10 {
-						resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
-						require.NoError(b, err)
-						require.Equal(b, 25, resp.Result)
-					}
-				}()
-			}
-			wg.Wait()
+		for range 10 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+				for range 10 {
+					resp, err := client.Add(ctx, testdata.AddReq{A: 10, B: 15})
+					require.NoError(t, err)
+					require.Equal(t, 25, resp.Result)
+				}
+			}()
 		}
+		wg.Wait()
 	})
+}
+
+func BenchmarkHttpTransportStress(b *testing.B) {
+	ctx := b.Context()
+
+	server := testdata.NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+	go server.Start(ctx, CreateAndStartListener(":8080", "/srpc", http.MethodPost))
+	defer server.Close()
+
+	client := testdata.NewTestServiceClient(srpc.NewClient("http://localhost:8080", codec.JSON, NewClientConnector("/srpc", http.MethodPost)))
+
+	for b.Loop() {
+		req := testdata.AddReq{A: rand.Int(), B: rand.Int()}
+		resp, err := client.Add(ctx, req)
+		_, _ = resp, err
+	}
 }

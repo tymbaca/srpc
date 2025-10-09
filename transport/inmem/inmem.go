@@ -175,7 +175,7 @@ func (c *conn) Close() error {
 	return nil
 }
 
-const _debug = true
+const _debug = false
 
 func debug(format string, args ...any) {
 	if _debug {
