@@ -2,13 +2,16 @@ package httptransport
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 
 	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/pkg/sps"
 )
 
 func NewClientConnector(path string, method string) srpc.Connector {
@@ -16,13 +19,32 @@ func NewClientConnector(path string, method string) srpc.Connector {
 		path:   path,
 		method: method,
 		client: &http.Client{},
+		spsKey: nil,
 	}
+}
+
+func NewClientConnectorSPS(path string, method string, privateKey string) (srpc.Connector, error) {
+	privateKeyRaw, err := hex.DecodeString(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("privateKey must be hex: %w", err)
+	}
+
+	spsKey := new(big.Int).SetBytes(privateKeyRaw)
+
+	return &Connector{
+		path:   path,
+		method: method,
+		client: &http.Client{},
+		spsKey: spsKey,
+	}, nil
 }
 
 type Connector struct {
 	path   string
 	method string
 	client *http.Client
+
+	spsKey *big.Int
 }
 
 func (cl *Connector) Connect(ctx context.Context, addr string) (srpc.ClientConn, error) {
@@ -42,6 +64,7 @@ type clientConn struct {
 	url    string
 	method string
 	client *http.Client
+	sps    *sps.SPS
 	close  func() error
 }
 
