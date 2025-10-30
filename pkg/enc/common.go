@@ -1,8 +1,10 @@
 package enc
 
 import (
-	"io"
+	"fmt"
 	"strings"
+
+	"github.com/tymbaca/srpc/pkg/fx"
 )
 
 type ServiceMethod String // e.g. "Service.Method"
@@ -16,21 +18,20 @@ func (sm ServiceMethod) Split() (service string, method string, ok bool) {
 	return parts[0], parts[1], true
 }
 
-type Request struct {
-	ServiceMethod ServiceMethod
-	Metadata      Metadata
-	Body          io.Reader `sbin:"-"`
-}
-
-type Response struct {
-	ServiceMethod ServiceMethod // echoes that of the Request
-	Metadata      Metadata
-	StatusCode    StatusCode
-	Error         error
-	Body          io.Reader `sbin:"-"`
-}
-
 type Metadata Slice[MetadataPair]
+
+func NewMetadata(m map[string][]string) Metadata {
+	pairs := make([]MetadataPair, 0, len(m))
+
+	for k, vals := range m {
+		pairs = append(pairs, MetadataPair{
+			Key:  NewString(k),
+			Vals: NewSlice(fx.Map(vals, NewString)...),
+		})
+	}
+
+	return Metadata(NewSlice(pairs...))
+}
 
 func (m Metadata) Map() map[string][]string {
 	res := make(map[string][]string, m.Len)
@@ -41,12 +42,31 @@ func (m Metadata) Map() map[string][]string {
 	return res
 }
 
+func (m Metadata) GoString() string {
+	return fmt.Sprintf("%v", m.Data)
+}
+
 type MetadataPair struct {
 	Key  String
 	Vals Slice[String]
 }
 
+func (p MetadataPair) String() string {
+	return fmt.Sprintf("{%s: %s}", p.Key, p.Vals.String())
+}
+
 type StatusCode int
+
+// TODO: remove iota
+const (
+	StatusOK StatusCode = iota
+	StatusErrorFromService
+	StatusInvalidServiceMethod
+	StatusServiceNotFound
+	StatusMethodNotFound
+	StatusBadRequest
+	StatusInternalError
+)
 
 func (s StatusCode) String() string {
 	switch s {
@@ -68,23 +88,3 @@ func (s StatusCode) String() string {
 
 	return ""
 }
-
-// TODO: remove iota
-const (
-	StatusOK StatusCode = iota
-	StatusErrorFromService
-	StatusInvalidServiceMethod
-	StatusServiceNotFound
-	StatusMethodNotFound
-	StatusBadRequest
-	StatusInternalError
-)
-
-func readReq(r io.Reader) (Request, error) {
-	var req Request
-
-}
-
-func writeReq(w io.Writer, req Request) error
-func readResp(r io.Reader) (Response, error)
-func writeResp(w io.Writer, req Response) error

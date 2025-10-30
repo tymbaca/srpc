@@ -8,3 +8,7 @@ type String struct {
 func NewString(v string) String {
 	return String{uint32(len(v)), v}
 }
+
+func (s String) String() string {
+	return s.Data
+}
