@@ -11,8 +11,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
-github.com/tymbaca/sbinary v0.5.1 h1:ThcQrDdkgSu1JyAbl3T2r9d2w9DBaukgepjniD/boKE=
-github.com/tymbaca/sbinary v0.5.1/go.mod h1:4NZJpBM6VJ5J+PCQczXXjXpSuqSfvhShRQfd4Uc7ehs=
+github.com/tymbaca/sbinary v0.7.0 h1:HHPxV395Nq1moru8xkwXuaEU8OmGT91mL3p6VXIl9x8=
+github.com/tymbaca/sbinary v0.7.0/go.mod h1:4NZJpBM6VJ5J+PCQczXXjXpSuqSfvhShRQfd4Uc7ehs=
 github.com/tymbaca/varint v0.2.1 h1:GDWWH7lxgnyooWXjbXmqvXBweXWMXC4H5B7v0kAbkE8=
 github.com/tymbaca/varint v0.2.1/go.mod h1:HNzrMVq8vDxg736NW77iR+vpw64LG/JtcsLxFlUK3yU=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=

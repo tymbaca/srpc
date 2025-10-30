@@ -10,14 +10,22 @@ import (
 )
 
 type Response struct {
+	Version    Version `sbin:"-"` // set by [Encoder]
 	StatusCode StatusCode
 	Metadata   Metadata
 	Error      error     `sbin:"-"`
 	Body       io.Reader `sbin:"-"` // nil if Error != nil
 }
 
-func ReadResponse(r io.Reader) (Response, error) {
+func (e *Encoder) ReadResponse(r io.Reader) (Response, error) {
 	var resp Response
+
+	ver, err := e.checkVersion(r)
+	if err != nil {
+		return Response{}, err
+	}
+	resp.Version = ver
+
 	if err := sbinary.NewDecoder(r).Decode(&resp, binary.BigEndian); err != nil {
 		return Response{}, fmt.Errorf("decode response header: %w", err)
 	}
@@ -36,7 +44,13 @@ func ReadResponse(r io.Reader) (Response, error) {
 	return resp, nil
 }
 
-func WriteResponse(w io.Writer, resp Response) error {
+func (e *Encoder) WriteResponse(w io.Writer, resp Response) error {
+	resp.Version = e.Version
+
+	if err := writeVersion(w, resp.Version); err != nil {
+		return err
+	}
+
 	if err := sbinary.NewEncoder(w).Encode(resp, binary.BigEndian); err != nil {
 		return fmt.Errorf("encode response header: %w", err)
 	}

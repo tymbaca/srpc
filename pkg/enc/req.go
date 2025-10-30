@@ -9,13 +9,21 @@ import (
 )
 
 type Request struct {
+	Version       Version `sbin:"-"`
 	ServiceMethod ServiceMethod
 	Metadata      Metadata
 	Body          io.Reader `sbin:"-"`
 }
 
-func ReadRequest(r io.Reader) (Request, error) {
+func (e *Encoder) ReadRequest(r io.Reader) (Request, error) {
 	var req Request
+
+	ver, err := e.checkVersion(r)
+	if err != nil {
+		return Request{}, err
+	}
+	req.Version = ver
+
 	if err := sbinary.NewDecoder(r).Decode(&req, binary.BigEndian); err != nil {
 		return Request{}, fmt.Errorf("decode request header: %w", err)
 	}
@@ -24,7 +32,13 @@ func ReadRequest(r io.Reader) (Request, error) {
 	return req, nil
 }
 
-func WriteRequest(w io.Writer, req Request) error {
+func (e *Encoder) WriteRequest(w io.Writer, req Request) error {
+	req.Version = e.Version
+
+	if err := writeVersion(w, req.Version); err != nil {
+		return err
+	}
+
 	if err := sbinary.NewEncoder(w).Encode(req, binary.BigEndian); err != nil {
 		return fmt.Errorf("encode request header: %w", err)
 	}

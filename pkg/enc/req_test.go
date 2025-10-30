@@ -10,12 +10,14 @@ import (
 
 func TestReq(t *testing.T) {
 	tests := []struct {
-		name  string
-		input Request
+		name    string
+		input   Request
+		encoder *Encoder
 	}{
 		{
 			name: "full",
 			input: Request{
+				Version:       Version{1, 0, 0},
 				ServiceMethod: ServiceMethod(NewString("testService.testMethod")),
 				Metadata: NewMetadata(map[string][]string{
 					"k1": {"v1", "v2"},
@@ -28,6 +30,7 @@ func TestReq(t *testing.T) {
 		{
 			name: "no body",
 			input: Request{
+				Version:       Version{1, 0, 0},
 				ServiceMethod: ServiceMethod(NewString("testService.testMethod")),
 				Metadata: NewMetadata(map[string][]string{
 					"k1": {"v1", "v2"},
@@ -46,11 +49,18 @@ func TestReq(t *testing.T) {
 				inputBody = tt.input.Body.(*bytes.Buffer).Bytes()
 			}
 
+			var e *Encoder
+			if tt.encoder != nil {
+				e = tt.encoder
+			} else {
+				e = &Encoder{Version: tt.input.Version, IgnoreVersion: false}
+			}
+
 			buf := new(bytes.Buffer)
-			err := WriteRequest(buf, tt.input)
+			err := e.WriteRequest(buf, tt.input)
 			require.NoError(t, err)
 
-			output, err := ReadRequest(buf)
+			output, err := e.ReadRequest(buf)
 			require.NoError(t, err)
 
 			if tt.input.Body != nil {

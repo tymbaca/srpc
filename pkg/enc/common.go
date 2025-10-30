@@ -1,7 +1,6 @@
 package enc
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/tymbaca/srpc/pkg/fx"
@@ -42,20 +41,12 @@ func (m Metadata) Map() map[string][]string {
 	return res
 }
 
-func (m Metadata) GoString() string {
-	return fmt.Sprintf("%v", m.Data)
-}
-
 type MetadataPair struct {
 	Key  String
 	Vals Slice[String]
 }
 
-func (p MetadataPair) String() string {
-	return fmt.Sprintf("{%s: %s}", p.Key, p.Vals.String())
-}
-
-type StatusCode int
+type StatusCode uint8
 
 // TODO: remove iota
 const (

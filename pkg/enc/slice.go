@@ -16,7 +16,7 @@ func NewSlice[T any](vs ...T) Slice[T] {
 }
 
 func (s Slice[T]) String() string {
-	return fmt.Sprintf("%#v", s.Data)
+	return fmt.Sprintf("%v", s.Data)
 }
 
 func stringSlice(ss Slice[String]) []string {
