@@ -6,14 +6,7 @@ import (
 )
 
 type Connector interface {
-	Connect(ctx context.Context, addr string) (ClientConn, error)
-}
-
-type ClientConn interface {
-	Do(ctx context.Context, req Request) (Response, error)
-
-	// Close must be called after Send
-	Close() error
+	Connect(ctx context.Context, addr string) (Conn, error)
 }
 
 var ErrListenerClosed = errors.New("listener is closed")
@@ -22,7 +15,7 @@ type Listener interface {
 	// Accept waits and returns new connection to the listener.
 	// If Listener got closed Accept must return [ErrListenerClosed],
 	// including Accept calls that didn't returned yet.
-	Accept() (ServerConn, error)
+	Accept() (Conn, error)
 
 	// Close closes the listener.
 	// Any blocked Accept operations will be unblocked and return errors.
@@ -30,11 +23,11 @@ type Listener interface {
 	Close() error
 }
 
-type ServerConn interface {
-	Request() Request
+type Conn interface {
 	Addr() string
-	Reply(ctx context.Context, resp Response) error
-
+	// Can return [io.EOF]
+	Read(p []byte) (n int, err error)
+	Write(p []byte) (n int, err error)
 	// Close must be called after Send
 	Close() error
 }

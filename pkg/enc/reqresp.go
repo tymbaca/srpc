@@ -1,14 +1,14 @@
-package srpc
+package enc
 
 import (
 	"io"
 	"strings"
 )
 
-type ServiceMethod string // e.g. "Service.Method"
+type ServiceMethod String // e.g. "Service.Method"
 
 func (sm ServiceMethod) Split() (service string, method string, ok bool) {
-	parts := strings.Split(string(sm), ".")
+	parts := strings.Split(sm.Data, ".")
 	if len(parts) != 2 {
 		return "", "", false
 	}
@@ -19,7 +19,7 @@ func (sm ServiceMethod) Split() (service string, method string, ok bool) {
 type Request struct {
 	ServiceMethod ServiceMethod
 	Metadata      Metadata
-	Body          io.Reader // TODO: close?
+	Body          io.Reader `sbin:"-"`
 }
 
 type Response struct {
@@ -27,10 +27,24 @@ type Response struct {
 	Metadata      Metadata
 	StatusCode    StatusCode
 	Error         error
-	Body          io.Reader // TODO: close?
+	Body          io.Reader `sbin:"-"`
 }
 
-type Metadata map[string][]string
+type Metadata Slice[MetadataPair]
+
+func (m Metadata) Map() map[string][]string {
+	res := make(map[string][]string, m.Len)
+	for _, pair := range m.Data {
+		res[pair.Key.Data] = stringSlice(pair.Vals)
+	}
+
+	return res
+}
+
+type MetadataPair struct {
+	Key  String
+	Vals Slice[String]
+}
 
 type StatusCode int
 
@@ -65,3 +79,12 @@ const (
 	StatusBadRequest
 	StatusInternalError
 )
+
+func readReq(r io.Reader) (Request, error) {
+	var req Request
+
+}
+
+func writeReq(w io.Writer, req Request) error
+func readResp(r io.Reader) (Response, error)
+func writeResp(w io.Writer, req Response) error

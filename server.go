@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"github.com/tymbaca/srpc/logger"
+	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
@@ -90,9 +91,15 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 		}
 
 		go func() {
-			err := s.handleConn(ctx, conn)
-			if err != nil {
-				s.logger.Error(err.Error())
+			for { // do we need this?
+				err := s.handleConn(ctx, conn)
+				if errors.Is(err, io.EOF) {
+					return
+				}
+				if err != nil {
+					s.logger.Error(err.Error())
+					return
+				}
 			}
 		}()
 	}
@@ -108,21 +115,24 @@ func (s *Server) Close() error {
 
 func (s *Server) handleConn(ctx context.Context, conn ServerConn) (err error) {
 	defer conn.Close()
-	req := conn.Request()
+	req, err := readReq(ctx, conn)
+	if err != nil {
+		return err
+	}
 
 	serviceName, methodName, ok := req.ServiceMethod.Split()
 	if !ok {
-		return conn.Reply(ctx, respError(req, StatusInvalidServiceMethod, ""))
+		return writeResp(ctx, conn, respError(req, StatusInvalidServiceMethod, ""))
 	}
 
 	service, ok := s.services[serviceName]
 	if !ok {
-		return conn.Reply(ctx, respError(req, StatusServiceNotFound, ""))
+		return writeResp(ctx, conn, respError(req, StatusServiceNotFound, ""))
 	}
 
 	method, ok := service.methods[methodName]
 	if !ok {
-		return conn.Reply(ctx, respError(req, StatusMethodNotFound, ""))
+		return writeResp(ctx, conn, respError(req, StatusMethodNotFound, ""))
 	}
 
 	resp := s.call(method, ctx, req)
@@ -133,8 +143,8 @@ func (s *Server) handleConn(ctx context.Context, conn ServerConn) (err error) {
 func (s *Server) call(m method, ctx context.Context, req Request) Response {
 	// TODO: put metadata in context
 
-	assert(m.val.Type().NumIn() == 2)
-	assert(m.val.Type().In(0) == reflect.TypeFor[context.Context]())
+	fx.Assert(m.val.Type().NumIn() == 2)
+	fx.Assert(m.val.Type().In(0) == reflect.TypeFor[context.Context]())
 
 	argVal := reflect.New(m.val.Type().In(1))
 	err := s.codec.Decode(req.Body, argVal.Interface())
@@ -173,7 +183,7 @@ func respError(req Request, statusCode StatusCode, errorMsg string, errorMsgArgs
 		ServiceMethod: req.ServiceMethod,
 		Metadata:      Metadata{},
 		StatusCode:    statusCode,
-		Error:         tern(errorMsg != "", fmt.Errorf(errorMsg, errorMsgArgs...), fmt.Errorf("code: %s", statusCode)),
+		Error:         fx.Tern(errorMsg != "", fmt.Errorf(errorMsg, errorMsgArgs...), fmt.Errorf("code: %s", statusCode)),
 		Body:          nil,
 	}
 
