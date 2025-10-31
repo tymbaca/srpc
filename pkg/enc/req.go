@@ -15,7 +15,7 @@ type Request struct {
 	Body          io.Reader `sbin:"-"`
 }
 
-func (e *Encoder) ReadRequest(r io.Reader) (Request, error) {
+func (e *Codec) ReadRequest(r io.Reader) (Request, error) {
 	var req Request
 
 	ver, err := e.checkVersion(r)
@@ -32,7 +32,7 @@ func (e *Encoder) ReadRequest(r io.Reader) (Request, error) {
 	return req, nil
 }
 
-func (e *Encoder) WriteRequest(w io.Writer, req Request) error {
+func (e *Codec) WriteRequest(w io.Writer, req Request) error {
 	req.Version = e.Version
 
 	if err := writeVersion(w, req.Version); err != nil {

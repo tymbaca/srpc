@@ -17,7 +17,7 @@ type Response struct {
 	Body       io.Reader `sbin:"-"` // nil if Error != nil
 }
 
-func (e *Encoder) ReadResponse(r io.Reader) (Response, error) {
+func (e *Codec) ReadResponse(r io.Reader) (Response, error) {
 	var resp Response
 
 	ver, err := e.checkVersion(r)
@@ -44,7 +44,7 @@ func (e *Encoder) ReadResponse(r io.Reader) (Response, error) {
 	return resp, nil
 }
 
-func (e *Encoder) WriteResponse(w io.Writer, resp Response) error {
+func (e *Codec) WriteResponse(w io.Writer, resp Response) error {
 	resp.Version = e.Version
 
 	if err := writeVersion(w, resp.Version); err != nil {

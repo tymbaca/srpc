@@ -1,6 +1,6 @@
 package enc
 
-type Encoder struct {
+type Codec struct {
 	Version       Version
 	IgnoreVersion bool
 }

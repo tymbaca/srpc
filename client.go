@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
@@ -14,37 +15,46 @@ var (
 	ErrTransportError = errors.New("transport error")
 )
 
+var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
+
 func NewClient(addr string, codec Codec, connector Connector) *Client {
 	return &Client{
-		addr:      addr,
-		codec:     codec,
-		connector: connector,
+		addr:         addr,
+		payloadcodec: codec,
+		connector:    connector,
 	}
 }
 
 type Client struct {
-	addr      string
-	codec     Codec
-	connector Connector
+	addr         string
+	headerCodec  Codec
+	payloadcodec Codec
+	connector    Connector
+}
+
+func (c *Client) encoder() enc.Codec {
+	return enc.Codec{Version: encVersion, IgnoreVersion: false}
 }
 
 // TODO: check metadata in context
 // TODO: timeouts? > but we support context
 
-func (c *Client) Call(ctx context.Context, serviceMethod ServiceMethod, req any, resp any) error {
+func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {
 	conn, err := c.connector.Connect(ctx, c.addr)
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
 
-	connResp, err := conn.Do(ctx, Request{
-		ServiceMethod: serviceMethod,
-		Metadata:      Metadata{}, // TODO:
-		Body:          pipe.ToReader(func(w io.Writer) error { return c.codec.Encode(w, req) }),
-	})
+	encReq := enc.Request{
+		ServiceMethod: enc.NewString(serviceMethod),
+		Metadata:      enc.Metadata{}, // TODO:
+		Body:          pipe.ToReader(func(w io.Writer) error { return c.payloadcodec.Encode(w, req) }),
+	}
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)
 	}
+
+	e := c.encoder()
 
 	if connResp.StatusCode != StatusOK {
 		coreErr := ErrTransportError
@@ -58,7 +68,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod ServiceMethod, req any,
 		}
 	}
 
-	err = c.codec.Decode(connResp.Body, resp)
+	err = c.payloadcodec.Decode(connResp.Body, resp)
 	if err != nil {
 		return fmt.Errorf("decode response body: %w", err)
 	}

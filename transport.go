@@ -3,14 +3,20 @@ package srpc
 import (
 	"context"
 	"errors"
+	"io"
 )
 
+// Connector connectes to another peer by it's address. Used by client.
 type Connector interface {
 	Connect(ctx context.Context, addr string) (Conn, error)
 }
 
+// ErrListenerClosed returned by [Listener.Accept] when listener is closed.
 var ErrListenerClosed = errors.New("listener is closed")
 
+// Listener accepts incoming connections.
+//
+// Multiple goroutines may invoke methods on a Listener simultaneously.
 type Listener interface {
 	// Accept waits and returns new connection to the listener.
 	// If Listener got closed Accept must return [ErrListenerClosed],
@@ -23,11 +29,13 @@ type Listener interface {
 	Close() error
 }
 
+// Conn provides a way for peers to write and read messages (request and responses).
+// Close is called after writes are done. After that, reading conn will receive [io.EOF].
 type Conn interface {
+	// Addr retuns address of the peer that is connected to current peer.
+	// Must be valid to use in [Connector.Connect].
 	Addr() string
-	// Can return [io.EOF]
-	Read(p []byte) (n int, err error)
-	Write(p []byte) (n int, err error)
-	// Close must be called after Send
-	Close() error
+
+	io.Reader
+	io.WriteCloser
 }

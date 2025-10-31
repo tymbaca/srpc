@@ -12,7 +12,7 @@ func TestReq(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   Request
-		encoder *Encoder
+		encoder *Codec
 	}{
 		{
 			name: "full",
@@ -49,11 +49,11 @@ func TestReq(t *testing.T) {
 				inputBody = tt.input.Body.(*bytes.Buffer).Bytes()
 			}
 
-			var e *Encoder
+			var e *Codec
 			if tt.encoder != nil {
 				e = tt.encoder
 			} else {
-				e = &Encoder{Version: tt.input.Version, IgnoreVersion: false}
+				e = &Codec{Version: tt.input.Version, IgnoreVersion: false}
 			}
 
 			buf := new(bytes.Buffer)

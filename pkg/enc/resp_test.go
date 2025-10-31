@@ -13,7 +13,7 @@ func TestResp(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   Response
-		encoder *Encoder
+		encoder *Codec
 	}{
 		{
 			name: "ok with body",
@@ -94,11 +94,11 @@ func TestResp(t *testing.T) {
 				inputBody = tt.input.Body.(*bytes.Buffer).Bytes()
 			}
 
-			var e *Encoder
+			var e *Codec
 			if tt.encoder != nil {
 				e = tt.encoder
 			} else {
-				e = &Encoder{Version: tt.input.Version, IgnoreVersion: false}
+				e = &Codec{Version: tt.input.Version, IgnoreVersion: false}
 			}
 
 			buf := new(bytes.Buffer)

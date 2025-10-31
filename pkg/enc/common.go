@@ -6,7 +6,7 @@ import (
 	"github.com/tymbaca/srpc/pkg/fx"
 )
 
-type ServiceMethod String // e.g. "Service.Method"
+type ServiceMethod = String // e.g. "Service.Method"
 
 func (sm ServiceMethod) Split() (service string, method string, ok bool) {
 	parts := strings.Split(sm.Data, ".")
