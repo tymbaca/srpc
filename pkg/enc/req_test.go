@@ -12,7 +12,7 @@ func TestReq(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   Request
-		encoder *Codec
+		encoder *Context
 	}{
 		{
 			name: "full",
@@ -49,18 +49,18 @@ func TestReq(t *testing.T) {
 				inputBody = tt.input.Body.(*bytes.Buffer).Bytes()
 			}
 
-			var e *Codec
+			var c Context
 			if tt.encoder != nil {
-				e = tt.encoder
+				c = *tt.encoder
 			} else {
-				e = &Codec{Version: tt.input.Version, IgnoreVersion: false}
+				c = Context{Version: tt.input.Version, IgnoreVersion: false}
 			}
 
 			buf := new(bytes.Buffer)
-			err := e.WriteRequest(buf, tt.input)
+			err := WriteRequest(c, buf, tt.input)
 			require.NoError(t, err)
 
-			output, err := e.ReadRequest(buf)
+			output, err := ReadRequest(c, buf)
 			require.NoError(t, err)
 
 			if tt.input.Body != nil {

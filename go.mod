@@ -3,8 +3,8 @@ module github.com/tymbaca/srpc
 go 1.24.0
 
 require (
-	github.com/tymbaca/sbinary v0.8.0
 	github.com/stretchr/testify v1.11.1
+	github.com/tymbaca/sbinary v0.8.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/tools v0.37.0
 )

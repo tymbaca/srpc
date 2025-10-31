@@ -31,6 +31,8 @@ type Listener interface {
 
 // Conn provides a way for peers to write and read messages (request and responses).
 // Close is called after writes are done. After that, reading conn will receive [io.EOF].
+// Close can be called multiple times. After invoking Close peer still can be
+// able to use Read.
 type Conn interface {
 	// Addr retuns address of the peer that is connected to current peer.
 	// Must be valid to use in [Connector.Connect].
@@ -38,4 +40,6 @@ type Conn interface {
 
 	io.Reader
 	io.WriteCloser
+
+	// TODO: read/write deadlines
 }

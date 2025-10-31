@@ -13,7 +13,7 @@ func TestResp(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   Response
-		encoder *Codec
+		encoder *Context
 	}{
 		{
 			name: "ok with body",
@@ -94,18 +94,18 @@ func TestResp(t *testing.T) {
 				inputBody = tt.input.Body.(*bytes.Buffer).Bytes()
 			}
 
-			var e *Codec
+			var c Context
 			if tt.encoder != nil {
-				e = tt.encoder
+				c = *tt.encoder
 			} else {
-				e = &Codec{Version: tt.input.Version, IgnoreVersion: false}
+				c = Context{Version: tt.input.Version, IgnoreVersion: false}
 			}
 
 			buf := new(bytes.Buffer)
-			err := e.WriteResponse(buf, tt.input)
+			err := WriteResponse(c, buf, tt.input)
 			require.NoError(t, err)
 
-			output, err := e.ReadResponse(buf)
+			output, err := ReadResponse(c, buf)
 			require.NoError(t, err)
 
 			if tt.input.Body != nil {

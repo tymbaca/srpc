@@ -8,15 +8,17 @@ import (
 	"reflect"
 
 	"github.com/tymbaca/srpc/logger"
+	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
 func NewServer(codec Codec, opts ...ServerOption) *Server {
 	s := &Server{
-		services: make(map[string]service),
+		enc:      enc.Context{Version: encVersion, IgnoreVersion: false},
 		codec:    codec,
 		logger:   logger.NoopLogger{},
+		services: make(map[string]service),
 	}
 
 	for _, o := range opts {
@@ -27,12 +29,12 @@ func NewServer(codec Codec, opts ...ServerOption) *Server {
 }
 
 type Server struct {
-	codec    Codec
-	services map[string]service
-
-	l Listener
-
+	enc    enc.Context
+	codec  Codec
 	logger logger.Logger
+
+	services map[string]service
+	l        Listener
 }
 
 type service struct {
@@ -113,78 +115,75 @@ func (s *Server) Close() error {
 	return nil
 }
 
-func (s *Server) handleConn(ctx context.Context, conn ServerConn) (err error) {
+func (s *Server) handleConn(ctx context.Context, conn Conn) (err error) {
 	defer conn.Close()
-	req, err := readReq(ctx, conn)
+	req, err := enc.ReadRequest(s.enc, conn)
 	if err != nil {
 		return err
 	}
 
 	serviceName, methodName, ok := req.ServiceMethod.Split()
 	if !ok {
-		return writeResp(ctx, conn, respError(req, StatusInvalidServiceMethod, ""))
+		return enc.WriteResponse(s.enc, conn, respError(enc.StatusInvalidServiceMethod, ""))
 	}
 
 	service, ok := s.services[serviceName]
 	if !ok {
-		return writeResp(ctx, conn, respError(req, StatusServiceNotFound, ""))
+		return enc.WriteResponse(s.enc, conn, respError(enc.StatusServiceNotFound, ""))
 	}
 
 	method, ok := service.methods[methodName]
 	if !ok {
-		return writeResp(ctx, conn, respError(req, StatusMethodNotFound, ""))
+		return enc.WriteResponse(s.enc, conn, respError(enc.StatusMethodNotFound, ""))
 	}
 
 	resp := s.call(method, ctx, req)
-
-	return conn.Reply(ctx, resp)
+	return enc.WriteResponse(s.enc, conn, resp)
 }
 
-func (s *Server) call(m method, ctx context.Context, req Request) Response {
+func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
 	// TODO: put metadata in context
 
-	fx.Assert(m.val.Type().NumIn() == 2)
-	fx.Assert(m.val.Type().In(0) == reflect.TypeFor[context.Context]())
+	fx.Assert(method.val.Type().NumIn() == 2)
+	fx.Assert(method.val.Type().In(0) == reflect.TypeFor[context.Context]())
 
-	argVal := reflect.New(m.val.Type().In(1))
+	argVal := reflect.New(method.val.Type().In(1))
 	err := s.codec.Decode(req.Body, argVal.Interface())
 	if err != nil {
-		return respError(req, StatusBadRequest, "can't decode: %w", err)
+		return respError(enc.StatusBadRequest, "can't decode: %w", err)
 	}
 
-	retVals := m.val.Call(toValues(ctx, argVal.Elem().Interface()))
+	retVals := method.val.Call(toValues(ctx, argVal.Elem().Interface()))
 	// assert(len(retVals) == 2)
 	// assert(reflect.TypeOf(retVals[1]) == reflect.TypeFor[error]())
 
 	ret := retVals[0].Interface()
 	if !retVals[1].IsNil() {
-		return respError(req, StatusErrorFromService, "error from service: %w", retVals[1].Interface().(error))
+		return respError(enc.StatusErrorFromService, "error from service: %w", retVals[1].Interface().(error))
 	}
 
-	return resp(req, StatusOK, pipe.ToReader(func(w io.Writer) error {
+	return resp(enc.StatusOK, pipe.ToReader(func(w io.Writer) error {
 		return s.codec.Encode(w, ret)
 	}))
 }
 
-func resp(req Request, statusCode StatusCode, body io.Reader) Response {
-	resp := Response{
-		ServiceMethod: req.ServiceMethod,
-		Metadata:      Metadata{},
-		StatusCode:    statusCode,
-		Error:         nil,
-		Body:          body,
+func resp(statusCode enc.StatusCode, body io.Reader) enc.Response {
+	resp := enc.Response{
+		Metadata:   enc.Metadata{},
+		StatusCode: statusCode,
+		Error:      nil,
+		Body:       body,
 	}
 
 	return resp
 }
 
-func respError(req Request, statusCode StatusCode, errorMsg string, errorMsgArgs ...any) Response {
-	resp := Response{
-		ServiceMethod: req.ServiceMethod,
-		Metadata:      Metadata{},
-		StatusCode:    statusCode,
-		Error:         fx.Tern(errorMsg != "", fmt.Errorf(errorMsg, errorMsgArgs...), fmt.Errorf("code: %s", statusCode)),
-		Body:          nil,
+func respError(statusCode enc.StatusCode, errorMsg string, errorMsgArgs ...any) enc.Response {
+	resp := enc.Response{
+		Metadata:   enc.Metadata{},
+		StatusCode: statusCode,
+		Error:      fx.Tern(errorMsg != "", fmt.Errorf(errorMsg, errorMsgArgs...), fmt.Errorf("code: %s", statusCode)),
+		Body:       nil,
 	}
 
 	return resp

@@ -15,10 +15,10 @@ type Request struct {
 	Body          io.Reader `sbin:"-"`
 }
 
-func (e *Codec) ReadRequest(r io.Reader) (Request, error) {
+func ReadRequest(c Context, r io.Reader) (Request, error) {
 	var req Request
 
-	ver, err := e.checkVersion(r)
+	ver, err := checkVersion(c, r)
 	if err != nil {
 		return Request{}, err
 	}
@@ -32,8 +32,8 @@ func (e *Codec) ReadRequest(r io.Reader) (Request, error) {
 	return req, nil
 }
 
-func (e *Codec) WriteRequest(w io.Writer, req Request) error {
-	req.Version = e.Version
+func WriteRequest(c Context, w io.Writer, req Request) error {
+	req.Version = c.Version
 
 	if err := writeVersion(w, req.Version); err != nil {
 		return err

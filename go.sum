@@ -13,6 +13,7 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/tymbaca/sbinary v0.7.0 h1:HHPxV395Nq1moru8xkwXuaEU8OmGT91mL3p6VXIl9x8=
 github.com/tymbaca/sbinary v0.7.0/go.mod h1:4NZJpBM6VJ5J+PCQczXXjXpSuqSfvhShRQfd4Uc7ehs=
+github.com/tymbaca/sbinary v0.8.0 h1:8OJ/nka1HNRZYnWsycp294DTDSGkTS4O+I7HNAy1Ns0=
 github.com/tymbaca/sbinary v0.8.0/go.mod h1:4NZJpBM6VJ5J+PCQczXXjXpSuqSfvhShRQfd4Uc7ehs=
 github.com/tymbaca/varint v0.2.1 h1:GDWWH7lxgnyooWXjbXmqvXBweXWMXC4H5B7v0kAbkE8=
 github.com/tymbaca/varint v0.2.1/go.mod h1:HNzrMVq8vDxg736NW77iR+vpw64LG/JtcsLxFlUK3yU=

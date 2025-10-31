@@ -21,7 +21,7 @@ func (v Version) String() string {
 	return fmt.Sprintf("v%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
-func (e *Codec) checkVersion(r io.Reader) (Version, error) {
+func checkVersion(e Context, r io.Reader) (Version, error) {
 	other, err := readVersion(r)
 	if err != nil {
 		return Version{}, err

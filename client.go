@@ -19,21 +19,18 @@ var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
 
 func NewClient(addr string, codec Codec, connector Connector) *Client {
 	return &Client{
-		addr:         addr,
-		payloadcodec: codec,
-		connector:    connector,
+		addr:      addr,
+		enc:       enc.Context{Version: encVersion, IgnoreVersion: false},
+		codec:     codec,
+		connector: connector,
 	}
 }
 
 type Client struct {
-	addr         string
-	headerCodec  Codec
-	payloadcodec Codec
-	connector    Connector
-}
-
-func (c *Client) encoder() enc.Codec {
-	return enc.Codec{Version: encVersion, IgnoreVersion: false}
+	addr      string
+	enc       enc.Context
+	codec     Codec
+	connector Connector
 }
 
 // TODO: check metadata in context
@@ -44,21 +41,28 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
+	defer conn.Close()
 
 	encReq := enc.Request{
 		ServiceMethod: enc.NewString(serviceMethod),
 		Metadata:      enc.Metadata{}, // TODO:
-		Body:          pipe.ToReader(func(w io.Writer) error { return c.payloadcodec.Encode(w, req) }),
+		Body:          pipe.ToReader(func(w io.Writer) error { return c.codec.Encode(w, req) }),
 	}
+
+	err = enc.WriteRequest(c.enc, conn, encReq)
+	conn.Close()
 	if err != nil {
-		return fmt.Errorf("send request: %w", err)
+		return err
 	}
 
-	e := c.encoder()
+	connResp, err := enc.ReadResponse(c.enc, conn)
+	if err != nil {
+		return err
+	}
 
-	if connResp.StatusCode != StatusOK {
+	if connResp.StatusCode != enc.StatusOK {
 		coreErr := ErrTransportError
-		if connResp.StatusCode == StatusErrorFromService {
+		if connResp.StatusCode == enc.StatusErrorFromService {
 			coreErr = ErrServiceError
 		}
 		if connResp.Error != nil {
@@ -68,7 +72,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 		}
 	}
 
-	err = c.payloadcodec.Decode(connResp.Body, resp)
+	err = c.codec.Decode(connResp.Body, resp)
 	if err != nil {
 		return fmt.Errorf("decode response body: %w", err)
 	}
