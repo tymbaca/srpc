@@ -3,11 +3,13 @@ package srpc
 import (
 	"context"
 	"errors"
-	"io"
+	"net"
+	"time"
 )
 
 // Connector connectes to another peer by it's address. Used by client.
 type Connector interface {
+	net.Conn
 	Connect(ctx context.Context, addr string) (Conn, error)
 }
 
@@ -38,8 +40,12 @@ type Conn interface {
 	// Must be valid to use in [Connector.Connect].
 	Addr() string
 
-	io.Reader
-	io.WriteCloser
+	Read(p []byte) (n int, err error)
+	Write(p []byte) (n int, err error)
 
-	// TODO: read/write deadlines
+	Close() error
+	CloseRead() error
+	CloseWrite() error
+
+	SetDeadline(t time.Time) error
 }

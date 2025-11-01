@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/pipe"
@@ -37,6 +38,7 @@ type Client struct {
 // TODO: timeouts? > but we support context
 
 func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {
+	http.Post()
 	conn, err := c.connector.Connect(ctx, c.addr)
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
