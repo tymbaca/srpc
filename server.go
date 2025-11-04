@@ -1,6 +1,7 @@
 package srpc
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/fx"
-	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
 func NewServer(codec Codec, opts ...ServerOption) *Server {
@@ -137,11 +137,15 @@ func (s *Server) handleConn(ctx context.Context, conn Conn) (err error) {
 		return enc.WriteResponse(s.enc, conn, respError(enc.StatusMethodNotFound, ""))
 	}
 
-	resp := s.call(method, ctx, req)
+	resp, err := s.call(method, ctx, req)
+	if err != nil {
+		return fmt.Errorf("call %s: %w", req.ServiceMethod.String(), err)
+	}
+
 	return enc.WriteResponse(s.enc, conn, resp)
 }
 
-func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
+func (s *Server) call(method method, ctx context.Context, req enc.Request) (enc.Response, error) {
 	// TODO: put metadata in context
 
 	fx.Assert(method.val.Type().NumIn() == 2)
@@ -150,7 +154,7 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 	argVal := reflect.New(method.val.Type().In(1))
 	err := s.codec.Decode(req.Body, argVal.Interface())
 	if err != nil {
-		return respError(enc.StatusBadRequest, "can't decode: %w", err)
+		return respError(enc.StatusBadRequest, "can't decode: %w", err), nil
 	}
 
 	retVals := method.val.Call(toValues(ctx, argVal.Elem().Interface()))
@@ -159,12 +163,15 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 
 	ret := retVals[0].Interface()
 	if !retVals[1].IsNil() {
-		return respError(enc.StatusErrorFromService, "error from service: %w", retVals[1].Interface().(error))
+		return respError(enc.StatusErrorFromService, "error from service: %w", retVals[1].Interface().(error)), nil
 	}
 
-	return resp(enc.StatusOK, pipe.ToReader(func(w io.Writer) error {
-		return s.codec.Encode(w, ret)
-	}))
+	bodyBuf := bytes.NewBuffer(nil)
+	if err := s.codec.Encode(bodyBuf, ret); err != nil {
+		return enc.Response{}, err
+	}
+
+	return resp(enc.StatusOK, bodyBuf), nil
 }
 
 func resp(statusCode enc.StatusCode, body io.Reader) enc.Response {

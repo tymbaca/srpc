@@ -1,6 +1,7 @@
 package enc
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -26,9 +27,16 @@ func ReadResponse(c Context, r io.Reader) (Response, error) {
 	}
 	resp.Version = ver
 
-	if err := sbinary.NewDecoder(r).Decode(&resp, binary.BigEndian); err != nil {
+	dec := sbinary.NewDecoder(r)
+	if err := dec.Decode(&resp, binary.BigEndian); err != nil {
 		return Response{}, fmt.Errorf("decode response header: %w", err)
 	}
+	var bh bodyHeader
+	if err := dec.Decode(&bh, binary.BigEndian); err != nil {
+		return Response{}, fmt.Errorf("decode body header: %w", err)
+	}
+
+	r = io.LimitReader(r, int64(bh.Size))
 
 	if resp.StatusCode == StatusOK {
 		resp.Body = r
@@ -44,6 +52,8 @@ func ReadResponse(c Context, r io.Reader) (Response, error) {
 	return resp, nil
 }
 
+// WriteResponse writes response into w.
+// See [WriteRequest].
 func WriteResponse(c Context, w io.Writer, resp Response) error {
 	resp.Version = c.Version
 
@@ -56,15 +66,26 @@ func WriteResponse(c Context, w io.Writer, resp Response) error {
 	}
 
 	if resp.Error != nil {
-		if _, err := w.Write([]byte(resp.Error.Error())); err != nil {
-			return fmt.Errorf("write response error: %w", err)
-		}
+		resp.Body = bytes.NewBuffer([]byte(resp.Error.Error()))
 	}
 
-	if resp.Body != nil {
-		if _, err := io.Copy(w, resp.Body); err != nil {
-			return fmt.Errorf("write response body: %w", err)
-		}
+	if resp.Body == nil {
+		resp.Body = bytes.NewBuffer(nil)
+	}
+
+	var bodyLen int
+	switch b := resp.Body.(type) {
+	case *bytes.Buffer:
+		bodyLen = b.Len()
+	default:
+		return fmt.Errorf("currently resp.Body must be [*bytes.Buffer], got: %#v", b)
+	}
+
+	if err := sbinary.NewEncoder(w).Encode(bodyHeader{Size: uint64(bodyLen)}, binary.BigEndian); err != nil {
+		return fmt.Errorf("write response body header: %w", err)
+	}
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		return fmt.Errorf("write response body: %w", err)
 	}
 
 	return nil

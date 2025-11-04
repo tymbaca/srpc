@@ -3,13 +3,11 @@ package srpc
 import (
 	"context"
 	"errors"
-	"net"
 	"time"
 )
 
 // Connector connectes to another peer by it's address. Used by client.
 type Connector interface {
-	net.Conn
 	Connect(ctx context.Context, addr string) (Conn, error)
 }
 
@@ -32,20 +30,15 @@ type Listener interface {
 }
 
 // Conn provides a way for peers to write and read messages (request and responses).
-// Close is called after writes are done. After that, reading conn will receive [io.EOF].
-// Close can be called multiple times. After invoking Close peer still can be
-// able to use Read.
+// Conn mimics [net.Conn] and [*net.TCPConn]. For details see its documentation.
 type Conn interface {
-	// Addr retuns address of the peer that is connected to current peer.
-	// Must be valid to use in [Connector.Connect].
-	Addr() string
+	RemoteAddr() string
+	LocalAddr() string
 
 	Read(p []byte) (n int, err error)
 	Write(p []byte) (n int, err error)
 
 	Close() error
-	CloseRead() error
-	CloseWrite() error
 
 	SetDeadline(t time.Time) error
 }

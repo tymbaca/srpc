@@ -1,14 +1,12 @@
 package srpc
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 
 	"github.com/tymbaca/srpc/pkg/enc"
-	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
 var (
@@ -38,17 +36,21 @@ type Client struct {
 // TODO: timeouts? > but we support context
 
 func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {
-	http.Post()
 	conn, err := c.connector.Connect(ctx, c.addr)
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
 	defer conn.Close()
 
+	reqBody := bytes.NewBuffer(nil)
+	if err := c.codec.Encode(reqBody, req); err != nil {
+		return fmt.Errorf("encode request body: %w", err)
+	}
+
 	encReq := enc.Request{
 		ServiceMethod: enc.NewString(serviceMethod),
 		Metadata:      enc.Metadata{}, // TODO:
-		Body:          pipe.ToReader(func(w io.Writer) error { return c.codec.Encode(w, req) }),
+		Body:          reqBody,
 	}
 
 	err = enc.WriteRequest(c.enc, conn, encReq)
