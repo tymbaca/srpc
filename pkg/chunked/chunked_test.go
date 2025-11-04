@@ -13,56 +13,67 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNotBuffered(t *testing.T) {
-	t.Run("", func(t *testing.T) {
+func run(t *testing.T, name string,
+	prep func(r io.Reader, w io.Writer) (io.Reader, io.WriteCloser),
+	input [][]byte,
+	check func(t *testing.T, input [][]byte, r io.Reader),
+) {
+	t.Run(name, func(t *testing.T) {
 		var wg sync.WaitGroup
 
 		client, server := net.Pipe()
-
-		clientChunked := NewWriter(client)
-		serverChunked := NewReader(server)
-
-		data := [][]byte{
-			[]byte("yo"),
-			[]byte("helloworld"),
-			{},
-		}
-
-		data[2] = make([]byte, math.MaxUint16*3+600)
-		rand.Read(data[2])
+		r, w := prep(server, client)
 
 		wg.Add(1)
 		go func() {
-			for _, c := range data {
-				n, err := clientChunked.Write(c)
+			for _, c := range input {
+				n, err := w.Write(c)
 				require.Equal(t, len(c), n)
 				require.NoError(t, err)
 			}
-			err := clientChunked.Close()
+			err := w.Close()
 			require.NoError(t, err)
 		}()
 
+		check(t, input, r)
+	})
+}
+
+func TestChunked(t *testing.T) {
+	noBufPrep := func(r io.Reader, w io.Writer) (io.Reader, io.WriteCloser) {
+		return NewReader(r), NewWriter(w)
+	}
+
+	testData1 := [][]byte{
+		[]byte("yo"),
+		[]byte("helloworld"),
+		{},
+	}
+	testData1[2] = make([]byte, math.MaxUint16*3+600)
+	rand.Read(testData1[2])
+
+	run(t, "not buffered", noBufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader) {
 		var got []byte
 		buf := make([]byte, 512)
 
-		n, err := serverChunked.Read(buf)
-		require.Equal(t, len(data[0]), n)
+		n, err := r.Read(buf)
+		require.Equal(t, len(testData1[0]), n)
 		require.NoError(t, err)
 		got = append(got, buf[:n]...)
 
-		n, err = serverChunked.Read(buf)
-		require.Equal(t, len(data[1]), n)
+		n, err = r.Read(buf)
+		require.Equal(t, len(testData1[1]), n)
 		require.NoError(t, err)
 		got = append(got, buf[:n]...)
 
 		// third chunk is big, so at least his first will fill buf entirely
-		n, err = serverChunked.Read(buf)
+		n, err = r.Read(buf)
 		require.Equal(t, len(buf), n)
 		require.NoError(t, err)
 		got = append(got, buf[:n]...)
 
 		for {
-			n, err := serverChunked.Read(buf)
+			n, err := r.Read(buf)
 			got = append(got, buf[:n]...)
 			if errors.Is(err, io.EOF) {
 				break
@@ -72,7 +83,43 @@ func TestNotBuffered(t *testing.T) {
 			}
 		}
 
-		expected := bytes.Join(data, nil)
+		expected := bytes.Join(input, nil)
+		require.Equal(t, expected, got)
+	})
+
+	run(t, "not buffered | empty", noBufPrep, nil, func(t *testing.T, input [][]byte, r io.Reader) {
+		buf := make([]byte, 512)
+
+		n, err := r.Read(buf)
+		require.Equal(t, 0, n)
+		require.ErrorIs(t, err, io.EOF)
+	})
+
+	bufPrep := func(r io.Reader, w io.Writer) (io.Reader, io.WriteCloser) {
+		return NewReader(r), NewBufferWriter(w)
+	}
+
+	run(t, "buffered", bufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader) {
+		var got []byte
+		buf := make([]byte, 512)
+
+		n, err := r.Read(buf)
+		require.Equal(t, len(buf), n)
+		require.NoError(t, err)
+		got = append(got, buf[:n]...)
+
+		for {
+			n, err := r.Read(buf)
+			got = append(got, buf[:n]...)
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				require.FailNow(t, "reader got non-EOF error: %s", err)
+			}
+		}
+
+		expected := bytes.Join(input, nil)
 		require.Equal(t, expected, got)
 	})
 }

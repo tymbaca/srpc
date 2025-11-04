@@ -7,7 +7,7 @@ import (
 
 func NewReader(r io.Reader) *Reader {
 	buf := bytes.NewBuffer(nil)
-	buf.Grow(4096)
+	buf.Grow(defaultBufSize)
 	return &Reader{r: r, buf: buf}
 }
 
