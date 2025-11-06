@@ -24,5 +24,9 @@ func writeChunk(w io.Writer, chunk chunk) (n int, err error) {
 		return 0, err
 	}
 
+	if chunk.Len == 0 {
+		return 0, nil
+	}
+
 	return w.Write(chunk.Data)
 }

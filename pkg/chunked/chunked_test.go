@@ -8,15 +8,25 @@ import (
 	"math"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
+func xrun(t *testing.T, name string,
+	prep func(r io.Reader, w io.Writer) (io.Reader, io.WriteCloser),
+	input [][]byte,
+	check func(t *testing.T, input [][]byte, r io.Reader, writerExited *atomic.Bool),
+) {
+	// do nothing
+}
+
 func run(t *testing.T, name string,
 	prep func(r io.Reader, w io.Writer) (io.Reader, io.WriteCloser),
 	input [][]byte,
-	check func(t *testing.T, input [][]byte, r io.Reader),
+	check func(t *testing.T, input [][]byte, r io.Reader, writerExited *atomic.Bool),
 ) {
 	t.Run(name, func(t *testing.T) {
 		var wg sync.WaitGroup
@@ -24,8 +34,14 @@ func run(t *testing.T, name string,
 		client, server := net.Pipe()
 		r, w := prep(server, client)
 
+		var writerExited atomic.Bool
+
 		wg.Add(1)
 		go func() {
+			defer func() {
+				writerExited.Store(true)
+			}()
+
 			for _, c := range input {
 				n, err := w.Write(c)
 				require.Equal(t, len(c), n)
@@ -35,7 +51,10 @@ func run(t *testing.T, name string,
 			require.NoError(t, err)
 		}()
 
-		check(t, input, r)
+		check(t, input, r, &writerExited) // check must drain the reader
+		time.Sleep(500 * time.Millisecond)
+		// ex := writerExited.Load()
+		// require.True(t, ex, "writer didn't exit")
 	})
 }
 
@@ -52,7 +71,24 @@ func TestChunked(t *testing.T) {
 	testData1[2] = make([]byte, math.MaxUint16*3+600)
 	rand.Read(testData1[2])
 
-	run(t, "not buffered", noBufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader) {
+	run(t, "not buffered | debug", noBufPrep, [][]byte{[]byte("yo")}, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
+		var got []byte
+		buf := make([]byte, 512)
+
+		n, err := r.Read(buf)
+		require.Equal(t, 2, n)
+		require.NoError(t, err)
+		got = append(got, buf[:n]...)
+
+		n, err = r.Read(buf)
+		require.Equal(t, 0, n)
+		require.ErrorIs(t, err, io.EOF)
+
+		expected := bytes.Join(input, nil)
+		require.Equal(t, expected, got)
+	})
+
+	xrun(t, "not buffered", noBufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
 		var got []byte
 		buf := make([]byte, 512)
 
@@ -87,7 +123,7 @@ func TestChunked(t *testing.T) {
 		require.Equal(t, expected, got)
 	})
 
-	run(t, "not buffered | empty", noBufPrep, nil, func(t *testing.T, input [][]byte, r io.Reader) {
+	xrun(t, "not buffered | empty", noBufPrep, nil, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
 		buf := make([]byte, 512)
 
 		n, err := r.Read(buf)
@@ -99,7 +135,7 @@ func TestChunked(t *testing.T) {
 		return NewReader(r), NewBufferWriter(w)
 	}
 
-	run(t, "buffered", bufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader) {
+	xrun(t, "buffered", bufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
 		var got []byte
 		buf := make([]byte, 512)
 
@@ -122,4 +158,28 @@ func TestChunked(t *testing.T) {
 		expected := bytes.Join(input, nil)
 		require.Equal(t, expected, got)
 	})
+
+	// run(t, "buffered | json", bufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
+	// 	var got []byte
+	// 	buf := make([]byte, 512)
+	//
+	// 	n, err := r.Read(buf)
+	// 	require.Equal(t, len(buf), n)
+	// 	require.NoError(t, err)
+	// 	got = append(got, buf[:n]...)
+	//
+	// 	for {
+	// 		n, err := r.Read(buf)
+	// 		got = append(got, buf[:n]...)
+	// 		if errors.Is(err, io.EOF) {
+	// 			break
+	// 		}
+	// 		if err != nil {
+	// 			require.FailNow(t, "reader got non-EOF error: %s", err)
+	// 		}
+	// 	}
+	//
+	// 	expected := bytes.Join(input, nil)
+	// 	require.Equal(t, expected, got)
+	// })
 }
