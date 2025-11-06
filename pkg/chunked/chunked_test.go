@@ -3,6 +3,7 @@ package chunked
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"io"
 	"math"
@@ -52,9 +53,9 @@ func run(t *testing.T, name string,
 		}()
 
 		check(t, input, r, &writerExited) // check must drain the reader
-		time.Sleep(500 * time.Millisecond)
-		// ex := writerExited.Load()
-		// require.True(t, ex, "writer didn't exit")
+
+		time.Sleep(5 * time.Millisecond) // to be sure
+		require.True(t, writerExited.Load(), "writer didn't exit")
 	})
 }
 
@@ -88,7 +89,7 @@ func TestChunked(t *testing.T) {
 		require.Equal(t, expected, got)
 	})
 
-	xrun(t, "not buffered", noBufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
+	run(t, "not buffered", noBufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
 		var got []byte
 		buf := make([]byte, 512)
 
@@ -123,7 +124,7 @@ func TestChunked(t *testing.T) {
 		require.Equal(t, expected, got)
 	})
 
-	xrun(t, "not buffered | empty", noBufPrep, nil, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
+	run(t, "not buffered | empty", noBufPrep, nil, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
 		buf := make([]byte, 512)
 
 		n, err := r.Read(buf)
@@ -135,7 +136,7 @@ func TestChunked(t *testing.T) {
 		return NewReader(r), NewBufferWriter(w)
 	}
 
-	xrun(t, "buffered", bufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
+	run(t, "buffered", bufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
 		var got []byte
 		buf := make([]byte, 512)
 
@@ -159,27 +160,20 @@ func TestChunked(t *testing.T) {
 		require.Equal(t, expected, got)
 	})
 
-	// run(t, "buffered | json", bufPrep, testData1, func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
-	// 	var got []byte
-	// 	buf := make([]byte, 512)
-	//
-	// 	n, err := r.Read(buf)
-	// 	require.Equal(t, len(buf), n)
-	// 	require.NoError(t, err)
-	// 	got = append(got, buf[:n]...)
-	//
-	// 	for {
-	// 		n, err := r.Read(buf)
-	// 		got = append(got, buf[:n]...)
-	// 		if errors.Is(err, io.EOF) {
-	// 			break
-	// 		}
-	// 		if err != nil {
-	// 			require.FailNow(t, "reader got non-EOF error: %s", err)
-	// 		}
-	// 	}
-	//
-	// 	expected := bytes.Join(input, nil)
-	// 	require.Equal(t, expected, got)
-	// })
+	run(t, "buffered | json", bufPrep, sli([]byte(`{"Foo": "Bar"}`)), func(t *testing.T, input [][]byte, r io.Reader, _ *atomic.Bool) {
+		type FooBar struct {
+			Foo string
+		}
+
+		want := FooBar{Foo: "Bar"}
+
+		var got FooBar
+		err := json.NewDecoder(r).Decode(&got)
+		require.NoError(t, err)
+		require.Equal(t, want, got)
+	})
+}
+
+func sli[T any](vs ...T) []T {
+	return vs
 }
