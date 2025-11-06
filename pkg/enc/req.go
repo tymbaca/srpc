@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/tymbaca/sbinary"
+	"github.com/tymbaca/srpc/pkg/chunked"
 )
 
 type Request struct {
@@ -17,25 +18,20 @@ type Request struct {
 }
 
 func ReadRequest(c Context, r io.Reader) (Request, error) {
+	cr := chunked.NewReader(r)
 	var req Request
 
-	ver, err := checkVersion(c, r)
+	ver, err := checkVersion(c, cr)
 	if err != nil {
 		return Request{}, err
 	}
 	req.Version = ver
 
-	dec := sbinary.NewDecoder(r)
-
-	if err := dec.Decode(&req, binary.BigEndian); err != nil {
+	if err := sbinary.NewDecoder(cr).Decode(&req, binary.BigEndian); err != nil {
 		return Request{}, fmt.Errorf("decode request header: %w", err)
 	}
-	var bh bodyHeader
-	if err := dec.Decode(&bh, binary.BigEndian); err != nil {
-		return Request{}, fmt.Errorf("decode body header: %w", err)
-	}
 
-	req.Body = io.LimitReader(r, int64(bh.Size))
+	req.Body = cr
 	return req, nil
 }
 
@@ -44,12 +40,14 @@ func ReadRequest(c Context, r io.Reader) (Request, error) {
 // In future, chunked io will be needed for dynamically filled readers.
 func WriteRequest(c Context, w io.Writer, req Request) error {
 	req.Version = c.Version
+	cw := chunked.NewBufferWriter(w)
+	defer cw.Close()
 
-	if err := writeVersion(w, req.Version); err != nil {
+	if err := writeVersion(cw, req.Version); err != nil {
 		return err
 	}
 
-	if err := sbinary.NewEncoder(w).Encode(req, binary.BigEndian); err != nil {
+	if err := sbinary.NewEncoder(cw).Encode(req, binary.BigEndian); err != nil {
 		return fmt.Errorf("encode request header: %w", err)
 	}
 
@@ -57,24 +55,9 @@ func WriteRequest(c Context, w io.Writer, req Request) error {
 		req.Body = bytes.NewBuffer(nil)
 	}
 
-	var bodyLen int
-	switch b := req.Body.(type) {
-	case *bytes.Buffer:
-		bodyLen = b.Len()
-	default:
-		return fmt.Errorf("currently req.Body must be [*bytes.Buffer], got: %#v", b)
-	}
-
-	if err := sbinary.NewEncoder(w).Encode(bodyHeader{Size: uint64(bodyLen)}, binary.BigEndian); err != nil {
-		return fmt.Errorf("write request body header: %w", err)
-	}
-	if _, err := io.Copy(w, req.Body); err != nil {
+	if _, err := io.Copy(cw, req.Body); err != nil {
 		return fmt.Errorf("write request body: %w", err)
 	}
 
 	return nil
-}
-
-type bodyHeader struct {
-	Size uint64
 }

@@ -28,6 +28,10 @@ func (w *BufferedWriter) Write(p []byte) (n int, err error) {
 	return w.bufw.Write(p)
 }
 
+func (w *BufferedWriter) Flush() error {
+	return w.bufw.Flush()
+}
+
 // Close flushed buffered data in chunk and then sends another chunk with zero
 // length, signaling reading side the [io.EOF].
 func (w *BufferedWriter) Close() error {

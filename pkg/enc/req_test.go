@@ -28,6 +28,19 @@ func TestReq(t *testing.T) {
 			},
 		},
 		{
+			name: "big payload",
+			input: Request{
+				Version:       Version{1, 0, 0},
+				ServiceMethod: ServiceMethod(NewString("testService.testMethod")),
+				Metadata: NewMetadata(map[string][]string{
+					"k1": {"v1", "v2"},
+					"k2": {"v3", "v4"},
+					"k3": {},
+				}),
+				Body: bytes.NewBuffer(bytes.Repeat([]byte("*"), 512*1024*1024)),
+			},
+		},
+		{
 			name: "no body",
 			input: Request{
 				Version:       Version{1, 0, 0},

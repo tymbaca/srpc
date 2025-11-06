@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/tymbaca/sbinary"
+	"github.com/tymbaca/srpc/pkg/chunked"
 )
 
 type Response struct {
@@ -19,29 +20,23 @@ type Response struct {
 }
 
 func ReadResponse(c Context, r io.Reader) (Response, error) {
+	cr := chunked.NewReader(r)
 	var resp Response
 
-	ver, err := checkVersion(c, r)
+	ver, err := checkVersion(c, cr)
 	if err != nil {
 		return Response{}, err
 	}
 	resp.Version = ver
 
-	dec := sbinary.NewDecoder(r)
-	if err := dec.Decode(&resp, binary.BigEndian); err != nil {
+	if err := sbinary.NewDecoder(cr).Decode(&resp, binary.BigEndian); err != nil {
 		return Response{}, fmt.Errorf("decode response header: %w", err)
 	}
-	var bh bodyHeader
-	if err := dec.Decode(&bh, binary.BigEndian); err != nil {
-		return Response{}, fmt.Errorf("decode body header: %w", err)
-	}
-
-	r = io.LimitReader(r, int64(bh.Size))
 
 	if resp.StatusCode == StatusOK {
-		resp.Body = r
+		resp.Body = cr
 	} else {
-		errBytes, err := io.ReadAll(r)
+		errBytes, err := io.ReadAll(cr)
 		if err != nil {
 			return Response{}, fmt.Errorf("read response error: %w", err)
 		}
@@ -56,35 +51,25 @@ func ReadResponse(c Context, r io.Reader) (Response, error) {
 // See [WriteRequest].
 func WriteResponse(c Context, w io.Writer, resp Response) error {
 	resp.Version = c.Version
+	cw := chunked.NewBufferWriter(w)
+	defer cw.Close()
 
-	if err := writeVersion(w, resp.Version); err != nil {
+	if err := writeVersion(cw, resp.Version); err != nil {
 		return err
 	}
 
-	if err := sbinary.NewEncoder(w).Encode(resp, binary.BigEndian); err != nil {
+	if err := sbinary.NewEncoder(cw).Encode(resp, binary.BigEndian); err != nil {
 		return fmt.Errorf("encode response header: %w", err)
 	}
 
 	if resp.Error != nil {
 		resp.Body = bytes.NewBuffer([]byte(resp.Error.Error()))
 	}
-
 	if resp.Body == nil {
 		resp.Body = bytes.NewBuffer(nil)
 	}
 
-	var bodyLen int
-	switch b := resp.Body.(type) {
-	case *bytes.Buffer:
-		bodyLen = b.Len()
-	default:
-		return fmt.Errorf("currently resp.Body must be [*bytes.Buffer], got: %#v", b)
-	}
-
-	if err := sbinary.NewEncoder(w).Encode(bodyHeader{Size: uint64(bodyLen)}, binary.BigEndian); err != nil {
-		return fmt.Errorf("write response body header: %w", err)
-	}
-	if _, err := io.Copy(w, resp.Body); err != nil {
+	if _, err := io.Copy(cw, resp.Body); err != nil {
 		return fmt.Errorf("write response body: %w", err)
 	}
 
