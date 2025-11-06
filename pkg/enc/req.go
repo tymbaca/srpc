@@ -18,7 +18,7 @@ type Request struct {
 }
 
 func ReadRequest(c Context, r io.Reader) (Request, error) {
-	cr := chunked.NewReader(r)
+	cr := chunked.NewReader(r) // TODO: use chunked only for body
 	var req Request
 
 	ver, err := checkVersion(c, cr)

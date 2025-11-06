@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"math"
+	"net"
 	"sync"
 
 	"github.com/tymbaca/srpc"
@@ -59,36 +60,33 @@ func (c *Cluster) nextAddr() string {
 type Peer struct {
 	cluster *Cluster
 	addr    string
-	inbox   chan *conn // only for delegating to peerListener
+	inbox   chan *conn
 }
 
-func (p *Peer) Listen() *peerListener {
-	l := &peerListener{
+func (p *Peer) Listen() *PeerListener {
+	l := &PeerListener{
 		parent: p,
-		inbox:  p.inbox,
 	}
 	l.ctx, l.cancel = context.WithCancel(context.Background())
 	return l
 }
 
-type peerListener struct {
-	parent *Peer // for debug purposes
+type PeerListener struct {
+	parent *Peer
 	ctx    context.Context
 	cancel context.CancelFunc
-
-	inbox chan *conn
 }
 
 // Accept waits and returns new connection to the listener.
 // If Listener got closed Accept must return [ErrListenerClosed],
 // including Accept calls that didn't returned yet.
-func (pl *peerListener) Accept() (srpc.ServerConn, error) {
+func (pl *PeerListener) Accept() (srpc.Conn, error) {
 	debug("wait for conn on inbox, peer: %+v", pl.parent)
 
 	select {
 	case <-pl.ctx.Done():
 		return nil, srpc.ErrListenerClosed
-	case conn := <-pl.inbox:
+	case conn := <-pl.parent.inbox:
 		return conn, nil
 	}
 }
@@ -96,21 +94,35 @@ func (pl *peerListener) Accept() (srpc.ServerConn, error) {
 // Close closes the listener.
 // Any blocked Accept operations will be unblocked and return errors.
 // Close can be called multiple times.
-func (pl *peerListener) Close() error {
+func (pl *PeerListener) Close() error {
 	pl.cancel()
 	return nil
 }
 
 var ErrPeerNotFound = errors.New("peer not found")
 
-func (p *Peer) Connect(_ context.Context, addr string) (srpc.ClientConn, error) {
+func (p *Peer) Connect(ctx context.Context, addr string) (srpc.Conn, error) {
 	target := p.cluster.getPeer(addr)
 	if target == nil {
 		return nil, ErrPeerNotFound
 	}
 
+	my, other := net.Pipe()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case target.inbox <- &conn{
+		c:          other,
+		localAddr:  addr,
+		remoteAddr: p.addr,
+	}:
+	}
+
 	return &conn{
-		client: p, server: target,
+		c:          my,
+		localAddr:  p.addr,
+		remoteAddr: addr,
 	}, nil
 }
 
@@ -119,60 +131,29 @@ func (p *Peer) Addr() string {
 }
 
 type conn struct {
-	client, server *Peer
-
-	ctx     context.Context
-	cancel  context.CancelFunc
-	req     srpc.Request
-	replyCh chan srpc.Response
+	c          net.Conn
+	localAddr  string
+	remoteAddr string
 }
 
-func (c *conn) Do(ctx context.Context, req srpc.Request) (srpc.Response, error) {
-	c.req = req
-	c.replyCh = make(chan srpc.Response)
-	c.ctx, c.cancel = context.WithCancel(ctx)
-	defer c.cancel()
-
-	debug("wait send conn to target inbox, me: %+v, target: %+v", c.client, c.server)
-
-	select {
-	case <-c.ctx.Done():
-		return srpc.Response{}, ctx.Err()
-	case c.server.inbox <- c:
-	}
-
-	select {
-	case <-c.ctx.Done():
-		return srpc.Response{}, ctx.Err()
-	case resp := <-c.replyCh:
-		return resp, nil
-	}
+func (c *conn) RemoteAddr() string {
+	return c.remoteAddr
 }
 
-func (c *conn) Request() srpc.Request {
-	return c.req
+func (c *conn) LocalAddr() string {
+	return c.localAddr
 }
 
-func (c *conn) Addr() string {
-	return c.client.Addr()
+func (c *conn) Read(p []byte) (n int, err error) {
+	return c.c.Read(p)
 }
 
-func (c *conn) Reply(ctx context.Context, resp srpc.Response) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case c.replyCh <- resp:
-		return nil
-	}
+func (c *conn) Write(p []byte) (n int, err error) {
+	return c.c.Write(p)
 }
 
-// Close must be called after Send
 func (c *conn) Close() error {
-	if c.cancel != nil {
-		c.cancel()
-	}
-
-	return nil
+	return c.c.Close()
 }
 
 const _debug = false

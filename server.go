@@ -93,15 +93,18 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 		}
 
 		go func() {
-			for { // do we need this?
-				err := s.handleConn(ctx, conn)
-				if errors.Is(err, io.EOF) {
-					return
-				}
-				if err != nil {
-					s.logger.Error(err.Error())
-					return
-				}
+			// conn := conn // WARN: do we need this?
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			go func() {
+				<-ctx.Done()
+				conn.Close()
+			}()
+
+			err := s.handleConn(ctx, conn)
+			if err != nil {
+				s.logger.Error(err.Error())
+				return
 			}
 		}()
 	}
@@ -116,7 +119,6 @@ func (s *Server) Close() error {
 }
 
 func (s *Server) handleConn(ctx context.Context, conn Conn) (err error) {
-	defer conn.Close()
 	req, err := enc.ReadRequest(s.enc, conn)
 	if err != nil {
 		return err
@@ -166,7 +168,7 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) (enc.
 		return respError(enc.StatusErrorFromService, "error from service: %w", retVals[1].Interface().(error)), nil
 	}
 
-	bodyBuf := bytes.NewBuffer(nil)
+	bodyBuf := bytes.NewBuffer(nil) // TODO: revert pipe.ToReader
 	if err := s.codec.Encode(bodyBuf, ret); err != nil {
 		return enc.Response{}, err
 	}

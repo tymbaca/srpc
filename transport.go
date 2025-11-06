@@ -3,7 +3,6 @@ package srpc
 import (
 	"context"
 	"errors"
-	"time"
 )
 
 // Connector connectes to another peer by it's address. Used by client.
@@ -30,7 +29,7 @@ type Listener interface {
 }
 
 // Conn provides a way for peers to write and read messages (request and responses).
-// Conn mimics [net.Conn] and [*net.TCPConn]. For details see its documentation.
+// Conn mimics [net.Conn]. For details see its documentation.
 type Conn interface {
 	RemoteAddr() string
 	LocalAddr() string
@@ -39,6 +38,4 @@ type Conn interface {
 	Write(p []byte) (n int, err error)
 
 	Close() error
-
-	SetDeadline(t time.Time) error
 }

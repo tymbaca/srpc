@@ -42,7 +42,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	}
 	defer conn.Close()
 
-	reqBody := bytes.NewBuffer(nil)
+	reqBody := bytes.NewBuffer(nil) // TODO: pipe.ToReader
 	if err := c.codec.Encode(reqBody, req); err != nil {
 		return fmt.Errorf("encode request body: %w", err)
 	}
@@ -54,7 +54,6 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	}
 
 	err = enc.WriteRequest(c.enc, conn, encReq)
-	conn.Close()
 	if err != nil {
 		return err
 	}

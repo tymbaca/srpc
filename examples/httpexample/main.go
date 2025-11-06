@@ -3,30 +3,36 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/codec"
-	httptransport "github.com/tymbaca/srpc/transport/http"
+	"github.com/tymbaca/srpc/transport/inmem"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go runServer(ctx)
-	runClient(ctx)
+	cluster := inmem.New()
+	client := cluster.NewPeer()
+	server := cluster.NewPeer()
+
+	go runServer(ctx, server)
+	runClient(ctx, client, server.Addr())
 }
 
-func runServer(ctx context.Context) {
-	err := NewTestServiceServer(srpc.NewServer(codec.JSON)).Start(ctx, httptransport.CreateAndStartListener(":8080", "/srpc", http.MethodPost))
+func runServer(ctx context.Context, peer *inmem.Peer) {
+	server := NewTestServiceServer(srpc.NewServer(codec.JSON))
+	defer server.Close()
+
+	err := server.Start(ctx, peer.Listen())
 	if err != nil {
 		panic(err)
 	}
 }
 
-func runClient(ctx context.Context) {
-	client := NewTestServiceClient(srpc.NewClient("localhost:8080", codec.JSON, httptransport.NewClientConnector("/srpc", http.MethodPost)))
+func runClient(ctx context.Context, peer *inmem.Peer, target string) {
+	client := NewTestServiceClient(srpc.NewClient(target, codec.JSON, peer))
 
 	// insead of `client.Call(ctx, "TestService.Divide", req, &resp)`
 	resp, err := client.Divide(ctx, DivideReq{A: 10, B: 2})
