@@ -101,7 +101,7 @@ func (pl *PeerListener) Close() error {
 
 var ErrPeerNotFound = errors.New("peer not found")
 
-func (p *Peer) Connect(ctx context.Context, addr string) (srpc.Conn, error) {
+func (p *Peer) Dial(ctx context.Context, addr string) (srpc.Conn, error) {
 	target := p.cluster.getPeer(addr)
 	if target == nil {
 		return nil, ErrPeerNotFound

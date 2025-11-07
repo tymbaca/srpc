@@ -5,9 +5,9 @@ import (
 	"errors"
 )
 
-// Connector connectes to another peer by it's address. Used by client.
-type Connector interface {
-	Connect(ctx context.Context, addr string) (Conn, error)
+// Dialer connectes to another peer by it's address. Used by client.
+type Dialer interface {
+	Dial(ctx context.Context, addr string) (Conn, error)
 }
 
 // ErrListenerClosed returned by [Listener.Accept] when listener is closed.

@@ -17,7 +17,7 @@ var (
 
 var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
 
-func NewClient(addr string, codec Codec, connector Connector) *Client {
+func NewClient(addr string, codec Codec, connector Dialer) *Client {
 	return &Client{
 		addr:      addr,
 		enc:       enc.Context{Version: encVersion, IgnoreVersion: false},
@@ -30,14 +30,14 @@ type Client struct {
 	addr      string
 	enc       enc.Context
 	codec     Codec
-	connector Connector
+	connector Dialer
 }
 
 // TODO: check metadata in context
 // TODO: timeouts? > but we support context
 
 func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {
-	conn, err := c.connector.Connect(ctx, c.addr)
+	conn, err := c.connector.Dial(ctx, c.addr)
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}

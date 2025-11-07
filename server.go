@@ -152,10 +152,6 @@ func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Respo
 	return s.call(method, ctx, req)
 }
 
-func drain(r io.Reader) {
-	io.Copy(io.Discard, r)
-}
-
 func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
 	// TODO: put metadata in context
 
@@ -257,4 +253,8 @@ func toValues(ins ...any) []reflect.Value {
 	}
 
 	return outs
+}
+
+func drain(r io.Reader) {
+	io.Copy(io.Discard, r)
 }
