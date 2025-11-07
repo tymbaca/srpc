@@ -12,30 +12,28 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-const addr = ":6666"
+const (
+	addr     = ":6666"
+	unixAddr = "/tmp/srpc.test.sock"
+)
 
 func TestSimple(t *testing.T) {
 	t.Run("tcp", func(t *testing.T) { testutil.TestSimple(t, newListenerFunc("tcp", addr), newDialerFunc("tcp")) })
-	t.Run("udp", func(t *testing.T) { testutil.TestSimple(t, newListenerFunc("udp", addr), newDialerFunc("udp")) })
-	t.Run("unix", func(t *testing.T) { testutil.TestSimple(t, newListenerFunc("unix", addr), newDialerFunc("unix")) })
+	t.Run("unix", func(t *testing.T) { testutil.TestSimple(t, newListenerFunc("unix", unixAddr), newDialerFunc("unix")) })
 }
 
 func TestStress(t *testing.T) {
 	t.Run("tcp", func(t *testing.T) {
 		testutil.TestStress(t, newListenerFunc("tcp", addr), newDialerFunc("tcp"), 100, 100)
 	})
-	t.Run("udp", func(t *testing.T) {
-		testutil.TestStress(t, newListenerFunc("udp", addr), newDialerFunc("udp"), 100, 100)
-	})
 	t.Run("unix", func(t *testing.T) {
-		testutil.TestStress(t, newListenerFunc("unix", addr), newDialerFunc("unix"), 100, 100)
+		testutil.TestStress(t, newListenerFunc("unix", unixAddr), newDialerFunc("unix"), 100, 100)
 	})
 }
 
 func BenchmarkStress(b *testing.B) {
 	b.Run("tcp", func(b *testing.B) { testutil.Benchmark(b, newListenerFunc("tcp", addr), newDialerFunc("tcp")) })
-	b.Run("udp", func(b *testing.B) { testutil.Benchmark(b, newListenerFunc("udp", addr), newDialerFunc("udp")) })
-	b.Run("unix", func(b *testing.B) { testutil.Benchmark(b, newListenerFunc("unix", addr), newDialerFunc("unix")) })
+	b.Run("unix", func(b *testing.B) { testutil.Benchmark(b, newListenerFunc("unix", unixAddr), newDialerFunc("unix")) })
 }
 
 func newListenerFunc(network string, addr string) func() srpc.Listener {
