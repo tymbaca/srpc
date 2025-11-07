@@ -171,6 +171,8 @@ func TestChunked(t *testing.T) {
 		err := json.NewDecoder(r).Decode(&got)
 		require.NoError(t, err)
 		require.Equal(t, want, got)
+
+		io.Copy(io.Discard, r)
 	})
 }
 

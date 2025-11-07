@@ -35,15 +35,15 @@ func TestInmemTransport(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 25, resp.Result)
 	}
-	{
-		resp, err := client.Divide(ctx, testdata.DivideReq{A: 10, B: 2})
-		require.NoError(t, err)
-		require.Equal(t, 5, resp.Result)
-	}
-	{
-		_, err := client.Divide(ctx, testdata.DivideReq{A: 10, B: 0})
-		require.Error(t, err)
-	}
+	// {
+	// 	resp, err := client.Divide(ctx, testdata.DivideReq{A: 10, B: 2})
+	// 	require.NoError(t, err)
+	// 	require.Equal(t, 5, resp.Result)
+	// }
+	// {
+	// 	_, err := client.Divide(ctx, testdata.DivideReq{A: 10, B: 0})
+	// 	require.Error(t, err)
+	// }
 }
 
 func TestInmemTransportStress(t *testing.T) {

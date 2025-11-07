@@ -11,14 +11,16 @@ import (
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/fx"
+	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
 func NewServer(codec Codec, opts ...ServerOption) *Server {
 	s := &Server{
-		enc:      enc.Context{Version: encVersion, IgnoreVersion: false},
-		codec:    codec,
-		logger:   logger.NoopLogger{},
-		services: make(map[string]service),
+		enc:            enc.Context{Version: encVersion, IgnoreVersion: false},
+		codec:          codec,
+		logger:         logger.NoopLogger{},
+		streamResponse: false,
+		services:       make(map[string]service),
 	}
 
 	for _, o := range opts {
@@ -29,9 +31,10 @@ func NewServer(codec Codec, opts ...ServerOption) *Server {
 }
 
 type Server struct {
-	enc    enc.Context
-	codec  Codec
-	logger logger.Logger
+	enc            enc.Context
+	codec          Codec
+	logger         logger.Logger
+	streamResponse bool
 
 	services map[string]service
 	l        Listener
@@ -124,30 +127,36 @@ func (s *Server) handleConn(ctx context.Context, conn Conn) (err error) {
 		return err
 	}
 
+	resp := s.handleReq(ctx, req)
+
+	drain(req.Body)
+	return enc.WriteResponse(s.enc, conn, resp)
+}
+
+func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Response) {
 	serviceName, methodName, ok := req.ServiceMethod.Split()
 	if !ok {
-		return enc.WriteResponse(s.enc, conn, respError(enc.StatusInvalidServiceMethod, ""))
+		return respError(enc.StatusInvalidServiceMethod, "")
 	}
 
 	service, ok := s.services[serviceName]
 	if !ok {
-		return enc.WriteResponse(s.enc, conn, respError(enc.StatusServiceNotFound, ""))
+		return respError(enc.StatusServiceNotFound, "")
 	}
 
 	method, ok := service.methods[methodName]
 	if !ok {
-		return enc.WriteResponse(s.enc, conn, respError(enc.StatusMethodNotFound, ""))
+		return respError(enc.StatusMethodNotFound, "")
 	}
 
-	resp, err := s.call(method, ctx, req)
-	if err != nil {
-		return fmt.Errorf("call %s: %w", req.ServiceMethod.String(), err)
-	}
-
-	return enc.WriteResponse(s.enc, conn, resp)
+	return s.call(method, ctx, req)
 }
 
-func (s *Server) call(method method, ctx context.Context, req enc.Request) (enc.Response, error) {
+func drain(r io.Reader) {
+	io.Copy(io.Discard, r)
+}
+
+func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
 	// TODO: put metadata in context
 
 	fx.Assert(method.val.Type().NumIn() == 2)
@@ -156,7 +165,7 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) (enc.
 	argVal := reflect.New(method.val.Type().In(1))
 	err := s.codec.Decode(req.Body, argVal.Interface())
 	if err != nil {
-		return respError(enc.StatusBadRequest, "can't decode: %w", err), nil
+		return respError(enc.StatusBadRequest, "can't decode input values: %w", err)
 	}
 
 	retVals := method.val.Call(toValues(ctx, argVal.Elem().Interface()))
@@ -165,15 +174,22 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) (enc.
 
 	ret := retVals[0].Interface()
 	if !retVals[1].IsNil() {
-		return respError(enc.StatusErrorFromService, "error from service: %w", retVals[1].Interface().(error)), nil
+		return respError(enc.StatusErrorFromService, "error from service: %w", retVals[1].Interface().(error))
 	}
 
-	bodyBuf := bytes.NewBuffer(nil) // TODO: revert pipe.ToReader
+	if s.streamResponse {
+		return resp(enc.StatusOK, pipe.ToReader(func(w io.Writer) error {
+			return s.codec.Encode(w, ret)
+		}))
+	}
+
+	bodyBuf := bytes.NewBuffer(nil)
+	bodyBuf.Grow(int(retVals[0].Type().Size())) // this is not an exact size, but it can be a good hint
 	if err := s.codec.Encode(bodyBuf, ret); err != nil {
-		return enc.Response{}, err
+		return respError(enc.StatusInternalError, "can't encode return values: %w", err)
 	}
 
-	return resp(enc.StatusOK, bodyBuf), nil
+	return resp(enc.StatusOK, bodyBuf)
 }
 
 func resp(statusCode enc.StatusCode, body io.Reader) enc.Response {

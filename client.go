@@ -1,12 +1,13 @@
 package srpc
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/tymbaca/srpc/pkg/enc"
+	"github.com/tymbaca/srpc/pkg/pipe"
 )
 
 var (
@@ -42,15 +43,12 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	}
 	defer conn.Close()
 
-	reqBody := bytes.NewBuffer(nil) // TODO: pipe.ToReader
-	if err := c.codec.Encode(reqBody, req); err != nil {
-		return fmt.Errorf("encode request body: %w", err)
-	}
-
 	encReq := enc.Request{
 		ServiceMethod: enc.NewString(serviceMethod),
 		Metadata:      enc.Metadata{}, // TODO:
-		Body:          reqBody,
+		Body: pipe.ToReader(func(w io.Writer) error {
+			return c.codec.Encode(w, req)
+		}),
 	}
 
 	err = enc.WriteRequest(c.enc, conn, encReq)
