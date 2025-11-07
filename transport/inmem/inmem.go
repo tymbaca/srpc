@@ -13,6 +13,8 @@ import (
 	"github.com/tymbaca/srpc"
 )
 
+var ErrPeerNotFound = errors.New("peer not found")
+
 type Cluster struct {
 	mu    sync.RWMutex
 	peers map[string]*Peer
@@ -77,9 +79,7 @@ type PeerListener struct {
 	cancel context.CancelFunc
 }
 
-// Accept waits and returns new connection to the listener.
-// If Listener got closed Accept must return [ErrListenerClosed],
-// including Accept calls that didn't returned yet.
+// Accept implements [srpc.Listerner].
 func (pl *PeerListener) Accept() (srpc.Conn, error) {
 	debug("wait for conn on inbox, peer: %+v", pl.parent)
 
@@ -91,15 +91,16 @@ func (pl *PeerListener) Accept() (srpc.Conn, error) {
 	}
 }
 
-// Close closes the listener.
-// Any blocked Accept operations will be unblocked and return errors.
-// Close can be called multiple times.
+// Close implements [srpc.Listerner].
 func (pl *PeerListener) Close() error {
 	pl.cancel()
 	return nil
 }
 
-var ErrPeerNotFound = errors.New("peer not found")
+// Addr implements [srpc.Listerner].
+func (pl *PeerListener) Addr() string {
+	return pl.parent.addr
+}
 
 func (p *Peer) Dial(ctx context.Context, addr string) (srpc.Conn, error) {
 	target := p.cluster.getPeer(addr)

@@ -62,7 +62,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	}
 
 	if connResp.StatusCode != enc.StatusOK {
-		coreErr := ErrTransportError
+		coreErr := ErrTransportError // TODO: remove. create function srpc.StatusFromError(err), so users can check status codes
 		if connResp.StatusCode == enc.StatusErrorFromService {
 			coreErr = ErrServiceError
 		}

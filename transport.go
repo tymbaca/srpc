@@ -26,6 +26,9 @@ type Listener interface {
 	// Any blocked Accept operations will be unblocked and return errors.
 	// Close can be called multiple times.
 	Close() error
+
+	// Addr returns listener's address. Address is valid to use in [Dialer.Dial].
+	Addr() string
 }
 
 // Conn provides a way for peers to write and read messages (request and responses).

@@ -2,6 +2,7 @@ package stdnet
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	"github.com/tymbaca/srpc"
@@ -22,11 +23,19 @@ type Listener struct {
 	l net.Listener
 }
 
+// Addr returns listener's address. Address is valid to use in [Dialer.Dial].
+func (l *Listener) Addr() string {
+	return l.l.Addr().String()
+}
+
 // Accept waits and returns new connection to the listener.
 // If Listener got closed Accept must return [ErrListenerClosed],
 // including Accept calls that didn't returned yet.
 func (l *Listener) Accept() (srpc.Conn, error) {
 	conn, err := l.l.Accept()
+	if errors.Is(err, net.ErrClosed) {
+		return nil, srpc.ErrListenerClosed
+	}
 	if err != nil {
 		return nil, err
 	}
