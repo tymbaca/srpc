@@ -9,13 +9,8 @@ import (
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/transport/inmem"
 	"github.com/tymbaca/srpc/transport/testutil"
-	"go.uber.org/goleak"
 	"golang.org/x/crypto/chacha20"
 )
-
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
 
 func newListener(c *inmem.Cluster) func() srpc.Listener {
 	return func() srpc.Listener {

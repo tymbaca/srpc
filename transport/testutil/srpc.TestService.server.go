@@ -5,6 +5,7 @@ package testutil
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/tymbaca/srpc"
 )
@@ -24,6 +25,11 @@ type TestServiceServer struct {
 }
 
 func (s *TestServiceServer) Add(ctx context.Context, req AddReq) (AddResp, error) {
+	return AddResp{req.A + req.B}, nil
+}
+
+func (s *TestServiceServer) LongAdd(ctx context.Context, req AddReq) (AddResp, error) {
+	time.Sleep(1 * time.Second)
 	return AddResp{req.A + req.B}, nil
 }
 

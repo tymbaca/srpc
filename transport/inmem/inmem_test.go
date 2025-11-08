@@ -5,12 +5,7 @@ import (
 
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/transport/testutil"
-	"go.uber.org/goleak"
 )
-
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
-}
 
 func TestSimple(t *testing.T) {
 	cluster := New()

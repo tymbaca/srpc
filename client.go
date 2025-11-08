@@ -34,14 +34,18 @@ type Client struct {
 }
 
 // TODO: check metadata in context
-// TODO: timeouts? > but we support context
 
 func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {
 	conn, err := c.connector.Dial(ctx, c.addr)
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
-	defer conn.Close() // TODO: ctx -> close
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		<-ctx.Done()
+		conn.Close()
+	}()
 
 	encReq := enc.Request{
 		ServiceMethod: enc.NewString(serviceMethod),

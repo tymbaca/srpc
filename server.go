@@ -96,7 +96,6 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 		}
 
 		go func() {
-			// conn := conn // WARN: do we need this?
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			go func() {

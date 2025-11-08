@@ -23,5 +23,6 @@ type (
 //go:generate srpc-gen --target=TestService
 type TestService interface {
 	Add(ctx context.Context, req AddReq) (AddResp, error)
+	LongAdd(ctx context.Context, req AddReq) (AddResp, error)
 	Divide(ctx context.Context, req DivideReq) (DivideResp, error)
 }
