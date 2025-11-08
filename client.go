@@ -41,7 +41,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
-	defer conn.Close()
+	defer conn.Close() // TODO: ctx -> close
 
 	encReq := enc.Request{
 		ServiceMethod: enc.NewString(serviceMethod),
