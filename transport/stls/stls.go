@@ -1,4 +1,4 @@
-// Package stls provides sRPC transport layer with key exchange and symmetric encription.
+// Package stls provides sRPC transport layer with key exchange and symmetric encryption.
 package stls
 
 import (
