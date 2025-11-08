@@ -40,12 +40,8 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
-	ctx, cancel := context.WithCancel(ctx)
+	_, cancel := closeOnCancel(ctx, conn)
 	defer cancel()
-	go func() {
-		<-ctx.Done()
-		conn.Close()
-	}()
 
 	encReq := enc.Request{
 		ServiceMethod: enc.NewString(serviceMethod),

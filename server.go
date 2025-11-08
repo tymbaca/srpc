@@ -77,18 +77,30 @@ func RegisterWithName[T any](s *Server, impl T, name string) {
 	s.services[name] = service
 }
 
+func closeOnCancel(ctx context.Context, c io.Closer) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		<-ctx.Done()
+		c.Close()
+	}()
+	return ctx, cancel
+}
+
+// Start starts server with provided listener. It blocks until server (listener) get closed.
+// In normal scenario, if [Server.Close] was called, Start will exit with nil.
+// See [Listener.Accept] for details.
 func (s *Server) Start(ctx context.Context, l Listener) error {
 	s.l = l
-	defer s.Close()
+	ctx, cancel := closeOnCancel(ctx, s)
+	defer cancel()
 
 	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
 		conn, err := s.l.Accept()
 		if errors.Is(err, ErrListenerClosed) {
 			return nil
+		}
+		if errors.Is(err, ErrListenerBadClose) {
+			return err
 		}
 		if err != nil {
 			s.logger.Error(err.Error())
@@ -96,12 +108,8 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 		}
 
 		go func() {
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := closeOnCancel(ctx, conn)
 			defer cancel()
-			go func() {
-				<-ctx.Done()
-				conn.Close()
-			}()
 
 			err := s.handleConn(ctx, conn)
 			if err != nil {
@@ -112,6 +120,7 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 	}
 }
 
+// Close closes currently running listener causing [Server.Start] to exit with nil.
 func (s *Server) Close() error {
 	if s.l != nil {
 		return s.l.Close()

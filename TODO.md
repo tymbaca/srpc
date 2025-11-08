@@ -1,2 +1,4 @@
 - [ ] ctx cancelation check
+    - [x] call (dial)
+    - [ ] listener (accept)
 - [ ] metadata from ctx

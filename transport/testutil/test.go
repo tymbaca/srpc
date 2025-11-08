@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -85,6 +86,10 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 		}
 	})
 
+	ctxCancelErrMsg := func(wait, waitCheck, dur time.Duration) string {
+		return fmt.Sprintf("exit after context cancelation was too long, ctx canceled after %s, function took %s to exit (limit was %s)", wait, dur-wait, waitCheck-wait)
+	}
+
 	t.Run("single client, context check", func(t *testing.T) {
 		listener := newListener()
 		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
@@ -102,8 +107,9 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 			_, err := client.LongAdd(ctx, AddReq{A: 10, B: 15})
 			dur := time.Since(start)
 			require.Error(t, err)
-			require.Less(t, dur, waitCheck, "exit after context cancelation was too long, ctx canceled after %s, function took %s to exit (limit was %s)", wait, dur-wait, waitCheck-wait)
+			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
 		})
+
 		t.Run("cancel", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -121,7 +127,43 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 			dur := time.Since(start)
 
 			require.Error(t, err)
-			require.Less(t, dur, waitCheck, "exit after context cancelation was too long, ctx canceled after %s, function took %s to exit (limit was %s)", wait, dur-wait, waitCheck-wait)
+			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
+		})
+	})
+
+	t.Run("server, context check", func(t *testing.T) {
+		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		defer server.Close()
+
+		wait := 20 * time.Millisecond
+		waitCheck := 25 * time.Millisecond
+		t.Run("timeout", func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(ctx, wait)
+			defer cancel()
+
+			start := time.Now()
+			err := server.Start(ctx, newListener())
+			dur := time.Since(start)
+			require.NoError(t, err)
+			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
+		})
+		t.Run("cancel", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			go func() {
+				select {
+				case <-ctx.Done():
+				case <-time.After(wait):
+					cancel()
+				}
+			}()
+
+			start := time.Now()
+			err := server.Start(ctx, newListener())
+			dur := time.Since(start)
+			require.NoError(t, err)
+			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
 		})
 	})
 
