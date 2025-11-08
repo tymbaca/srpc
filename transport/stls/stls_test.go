@@ -2,15 +2,66 @@ package stls
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/transport/inmem"
+	"github.com/tymbaca/srpc/transport/testutil"
+	"go.uber.org/goleak"
 	"golang.org/x/crypto/chacha20"
 )
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+}
+
+func newListener(c *inmem.Cluster) func() srpc.Listener {
+	return func() srpc.Listener {
+		l, err := NewListenerRandomKey(c.NewPeer().Listen())
+		if err != nil {
+			panic(err)
+		}
+		return l
+	}
+}
+
+func newDialer(c *inmem.Cluster) func() srpc.Dialer {
+	return func() srpc.Dialer {
+		d, err := NewDialerRandomKey(c.NewPeer())
+		if err != nil {
+			panic(err)
+		}
+		return d
+	}
+}
+
+func TestSimple(t *testing.T) {
+	c := inmem.New()
+	testutil.TestSimple(t,
+		newListener(c),
+		newDialer(c),
+	)
+}
+
+func TestStress(t *testing.T) {
+	c := inmem.New()
+	testutil.TestStress(t,
+		newListener(c),
+		newDialer(c),
+		100,
+		100,
+	)
+}
+
+func BenchmarkStress(b *testing.B) {
+	c := inmem.New()
+	testutil.Benchmark(b,
+		newListener(c),
+		newDialer(c),
+	)
+}
 
 func TestInside(t *testing.T) {
 	ctx := t.Context()
@@ -19,15 +70,7 @@ func TestInside(t *testing.T) {
 	clientPeer := cluster.NewPeer()
 	serverPeer := cluster.NewPeer()
 
-	clientInterceptor := &interceptorConn{
-		wdata: &bytes.Buffer{},
-		rdata: &bytes.Buffer{},
-	}
-
-	interceptorDialer := &interceptorDialer{
-		interceptor: clientInterceptor,
-		Dialer:      clientPeer,
-	}
+	interceptorDialer, interceptor := testutil.NewDialInterceptor(clientPeer)
 
 	dialer, err := NewDialerRandomKey(interceptorDialer)
 	require.NoError(t, err)
@@ -67,45 +110,12 @@ func TestInside(t *testing.T) {
 		pubKeyLen := 65
 		handshakeLen := 1 + 1 + pubKeyLen + 1 + chacha20.NonceSizeX
 
-		wdata := clientInterceptor.wdata.Bytes()
+		wdata := interceptor.WData.Bytes()
 		require.Len(t, wdata, handshakeLen+len(clientMsg))
 		require.NotEqual(t, clientMsg, wdata[handshakeLen:])
 
-		rdata := clientInterceptor.rdata.Bytes()
+		rdata := interceptor.RData.Bytes()
 		require.Len(t, rdata, handshakeLen+len(serverMsg))
 		require.NotEqual(t, serverMsg, rdata[handshakeLen:])
 	}
-}
-
-type interceptorDialer struct {
-	interceptor *interceptorConn
-	srpc.Dialer
-}
-
-func (d *interceptorDialer) Dial(ctx context.Context, addr string) (srpc.Conn, error) {
-	conn, err := d.Dialer.Dial(ctx, addr)
-	if err != nil {
-		return nil, err
-	}
-
-	d.interceptor.Conn = conn
-	return d.interceptor, nil
-}
-
-type interceptorConn struct {
-	wdata *bytes.Buffer
-	rdata *bytes.Buffer
-	srpc.Conn
-}
-
-func (c *interceptorConn) Read(p []byte) (n int, err error) {
-	n, err = c.Conn.Read(p)
-	c.rdata.Write(p[:n])
-	return n, err
-}
-
-func (c *interceptorConn) Write(p []byte) (n int, err error) {
-	n, err = c.Conn.Write(p)
-	c.wdata.Write(p[:n])
-	return n, err
 }
