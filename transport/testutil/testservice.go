@@ -20,9 +20,20 @@ type (
 	}
 )
 
+type (
+	ReplyMDReq struct {
+		Key string
+	}
+	ReplyMDResp struct {
+		Vals []string
+		Ok   bool
+	}
+)
+
 //go:generate srpc-gen --target=TestService
 type TestService interface {
 	Add(ctx context.Context, req AddReq) (AddResp, error)
 	LongAdd(ctx context.Context, req AddReq) (AddResp, error)
 	Divide(ctx context.Context, req DivideReq) (DivideResp, error)
+	ReplyMD(ctx context.Context, req ReplyMDReq) (ReplyMDResp, error)
 }

@@ -43,9 +43,10 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	_, cancel := closeOnCancel(ctx, conn)
 	defer cancel()
 
+	md, _ := MetadataFromContext(ctx)
 	encReq := enc.Request{
 		ServiceMethod: enc.NewString(serviceMethod),
-		Metadata:      enc.Metadata{}, // TODO:
+		Metadata:      enc.NewMetadata(md),
 		Body: pipe.ToReader(func(w io.Writer) error {
 			return c.codec.Encode(w, req)
 		}),

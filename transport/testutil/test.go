@@ -84,6 +84,19 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 			_, err := client.Divide(ctx, DivideReq{A: 10, B: 0})
 			require.Error(t, err)
 		}
+		{
+			ctx := srpc.ContextWithMetadata(ctx, srpc.Metadata{
+				"k1": {"v1", "v2"},
+			})
+
+			resp, err := client.ReplyMD(ctx, ReplyMDReq{Key: "k1"})
+			require.NoError(t, err)
+			require.Equal(t, ReplyMDResp{Vals: []string{"v1", "v2"}, Ok: true}, resp)
+
+			resp, err = client.ReplyMD(ctx, ReplyMDReq{Key: "badkey"})
+			require.NoError(t, err)
+			require.Equal(t, ReplyMDResp{Ok: false}, resp)
+		}
 	})
 
 	ctxCancelErrMsg := func(wait, waitCheck, dur time.Duration) string {

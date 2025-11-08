@@ -161,7 +161,7 @@ func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Respo
 }
 
 func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
-	// TODO: put metadata in context
+	ctx = ContextWithMetadata(ctx, req.Metadata.Map())
 
 	fx.Assert(method.val.Type().NumIn() == 2)
 	fx.Assert(method.val.Type().In(0) == reflect.TypeFor[context.Context]())

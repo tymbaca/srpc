@@ -30,3 +30,8 @@ func (c *TestServiceClient) Divide(ctx context.Context, req DivideReq) (resp Div
 	err = c.Client.Call(ctx, "TestService.Divide", req, &resp)
 	return resp, err
 }
+
+func (c *TestServiceClient) ReplyMD(ctx context.Context, req ReplyMDReq) (resp ReplyMDResp, err error) {
+	err = c.Client.Call(ctx, "TestService.ReplyMD", req, &resp)
+	return resp, err
+}

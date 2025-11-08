@@ -40,3 +40,13 @@ func (s *TestServiceServer) Divide(ctx context.Context, req DivideReq) (DivideRe
 
 	return DivideResp{req.A / req.B}, nil
 }
+
+func (s *TestServiceServer) ReplyMD(ctx context.Context, req ReplyMDReq) (ReplyMDResp, error) {
+	md, ok := srpc.MetadataFromContext(ctx)
+	if !ok {
+		return ReplyMDResp{Ok: false}, nil
+	}
+
+	val, ok := md[req.Key]
+	return ReplyMDResp{Vals: val, Ok: ok}, nil
+}

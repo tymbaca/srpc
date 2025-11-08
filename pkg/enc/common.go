@@ -20,6 +20,10 @@ func (sm ServiceMethod) Split() (service string, method string, ok bool) {
 type Metadata Slice[MetadataPair]
 
 func NewMetadata(m map[string][]string) Metadata {
+	if len(m) == 0 {
+		return Metadata{}
+	}
+
 	pairs := make([]MetadataPair, 0, len(m))
 
 	for k, vals := range m {
