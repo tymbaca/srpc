@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/transport/inmem"
+	"golang.org/x/crypto/chacha20"
 )
 
 func TestInside(t *testing.T) {
@@ -63,7 +64,8 @@ func TestInside(t *testing.T) {
 	require.Equal(t, serverMsg, buf)
 
 	{
-		handshakeLen := 1 + 1 + 32
+		pubKeyLen := 65
+		handshakeLen := 1 + 1 + pubKeyLen + 1 + chacha20.NonceSizeX
 
 		wdata := clientInterceptor.wdata.Bytes()
 		require.Len(t, wdata, handshakeLen+len(clientMsg))

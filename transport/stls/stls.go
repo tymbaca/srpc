@@ -2,6 +2,7 @@
 package stls
 
 import (
+	"bytes"
 	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/binary"
@@ -20,25 +21,43 @@ const (
 	_version uint8 = 1
 )
 
-func handshake(conn srpc.Conn, key *ecdh.PrivateKey, writeFirst bool) (_ *Conn, err error) {
-	var hisPublicKey *ecdh.PublicKey
-	if writeFirst {
-		err = writeKey(conn, key.PublicKey())
+type exchangeKeyMsg struct {
+	Version  uint8
+	KeyLen   uint8 `sbin:"lenof:Key"`
+	Key      []byte
+	NonceLen uint8 `sbin:"lenof:Nonce"`
+	Nonce    []byte
+}
+
+func handshake(conn srpc.Conn, key *ecdh.PrivateKey, lead bool) (_ *Conn, err error) {
+	var (
+		hisPublicKey *ecdh.PublicKey
+		nonce        []byte
+	)
+	if lead {
+		nonce = make([]byte, chacha20.NonceSizeX)
+		rand.Read(nonce)
+
+		err = writeMsg(conn, key.PublicKey(), nonce)
 		if err != nil {
 			return nil, fmt.Errorf("write key: %w", err)
 		}
 
-		hisPublicKey, err = readKey(conn)
+		var gotNonce []byte
+		hisPublicKey, gotNonce, err = readKey(conn)
 		if err != nil {
 			return nil, fmt.Errorf("read key: %w", err)
 		}
+		if !bytes.Equal(nonce, gotNonce) {
+			return nil, fmt.Errorf("peer sent incorrect nonce: got %v, want %v", gotNonce, nonce)
+		}
 	} else {
-		hisPublicKey, err = readKey(conn)
+		hisPublicKey, nonce, err = readKey(conn)
 		if err != nil {
 			return nil, fmt.Errorf("read key: %w", err)
 		}
 
-		err = writeKey(conn, key.PublicKey())
+		err = writeMsg(conn, key.PublicKey(), nonce)
 		if err != nil {
 			return nil, fmt.Errorf("write key: %w", err)
 		}
@@ -49,9 +68,6 @@ func handshake(conn srpc.Conn, key *ecdh.PrivateKey, writeFirst bool) (_ *Conn, 
 		return nil, err
 	}
 
-	nonce := make([]byte, chacha20.NonceSizeX)
-	rand.Read(nonce)
-
 	stream, err := chacha20.NewUnauthenticatedCipher(secretKey, nonce)
 	if err != nil {
 		return nil, fmt.Errorf("create chacha20 cipher: %w", err)
@@ -60,32 +76,28 @@ func handshake(conn srpc.Conn, key *ecdh.PrivateKey, writeFirst bool) (_ *Conn, 
 	return connWithCipher(conn, stream), nil
 }
 
-func writeKey(w io.Writer, key *ecdh.PublicKey) error {
+func writeMsg(w io.Writer, key *ecdh.PublicKey, nonce []byte) error {
 	keyBytes := key.Bytes()
 	msg := exchangeKeyMsg{
-		Version: _version,
-		Len:     uint8(len(keyBytes)),
-		Key:     keyBytes,
+		Version:  _version,
+		KeyLen:   uint8(len(keyBytes)),
+		Key:      keyBytes,
+		NonceLen: uint8(len(nonce)),
+		Nonce:    nonce,
 	}
 	return sbinary.NewEncoder(w).Encode(msg, binary.BigEndian)
 }
 
-func readKey(r io.Reader) (key *ecdh.PublicKey, err error) {
+func readKey(r io.Reader) (key *ecdh.PublicKey, nonce []byte, err error) {
 	var msg exchangeKeyMsg
 	if err := sbinary.NewDecoder(r).Decode(&msg, binary.BigEndian); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	key, err = ecdh.P256().NewPublicKey(msg.Key)
 	if err != nil {
-		return nil, fmt.Errorf("got incorrect public key from peer: %w", err)
+		return nil, nil, fmt.Errorf("got incorrect public key from peer: %w", err)
 	}
 
-	return key, nil
-}
-
-type exchangeKeyMsg struct {
-	Version uint8
-	Len     uint8 `sbin:"lenof:Key"`
-	Key     []byte
+	return key, msg.Nonce, nil
 }
