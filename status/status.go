@@ -9,7 +9,7 @@ type Code uint8
 
 const (
 	OK                   Code = 0
-	ErrorFromService     Code = 1 // Error from server application code
+	ErrorFromService     Code = 1 // Set when server application code returned error without specifying the status (with [Error] or [Errorf])
 	InvalidServiceMethod Code = 2
 	ServiceNotFound      Code = 3
 	MethodNotFound       Code = 4

@@ -28,8 +28,6 @@ type Client struct {
 	connector Dialer
 }
 
-// TODO: check metadata in context
-
 func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {
 	conn, err := c.connector.Dial(ctx, c.addr)
 	if err != nil {
@@ -58,7 +56,11 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	}
 
 	if connResp.StatusCode != status.OK {
-		return status.Error(connResp.StatusCode, connResp.Error.Error()) // no wrapping, because connResp.Error always holds raw string error
+		errMsg := connResp.Error.Error()
+		if errMsg == "" {
+			errMsg = "(no error descroption)"
+		}
+		return status.Error(connResp.StatusCode, errMsg) // no wrapping, because connResp.Error always holds raw string error
 	}
 
 	err = c.codec.Decode(connResp.Body, resp)

@@ -12,6 +12,7 @@ import (
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/logger"
+	"github.com/tymbaca/srpc/status"
 	"go.uber.org/goleak"
 )
 
@@ -83,7 +84,16 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 		{
 			_, err := client.Divide(ctx, DivideReq{A: 10, B: 0})
 			require.Error(t, err)
-			// TODO: srpc.StatusFromError() == ErrorFromService
+			code, ok := status.FromError(err)
+			require.True(t, ok)
+			require.Equal(t, status.InvalidArgument, code)
+		}
+		{
+			_, err := client.Divide(ctx, DivideReq{A: 10, B: -1})
+			require.Error(t, err)
+			code, ok := status.FromError(err)
+			require.True(t, ok)
+			require.Equal(t, status.ErrorFromService, code)
 		}
 		{
 			ctx := srpc.ContextWithMetadata(ctx, srpc.Metadata{

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/status"
 )
 
 func NewTestServiceServer(s *srpc.Server) *TestServiceServer {
@@ -34,8 +35,11 @@ func (s *TestServiceServer) LongAdd(ctx context.Context, req AddReq) (AddResp, e
 }
 
 func (s *TestServiceServer) Divide(ctx context.Context, req DivideReq) (DivideResp, error) {
+	if req.B == -1 {
+		return DivideResp{}, errors.New("i don't want to divide by -1")
+	}
 	if req.B == 0 {
-		return DivideResp{}, errors.New("can't divide to 0")
+		return DivideResp{}, status.Error(status.InvalidArgument, "can't divide to 0")
 	}
 
 	return DivideResp{req.A / req.B}, nil

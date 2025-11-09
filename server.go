@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/pkg/enc"
@@ -145,17 +146,17 @@ func (s *Server) handleConn(ctx context.Context, conn Conn) (err error) {
 func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Response) {
 	serviceName, methodName, ok := req.ServiceMethod.Split()
 	if !ok {
-		return respError(status.InvalidServiceMethod, "")
+		return respErrorf(status.InvalidServiceMethod, "")
 	}
 
 	service, ok := s.services[serviceName]
 	if !ok {
-		return respError(status.ServiceNotFound, "")
+		return respErrorf(status.ServiceNotFound, "")
 	}
 
 	method, ok := service.methods[methodName]
 	if !ok {
-		return respError(status.MethodNotFound, "")
+		return respErrorf(status.MethodNotFound, "")
 	}
 
 	return s.call(method, ctx, req)
@@ -170,7 +171,7 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 	argVal := reflect.New(method.val.Type().In(1))
 	err := s.codec.Decode(req.Body, argVal.Interface())
 	if err != nil {
-		return respError(status.InvalidArgument, "can't decode input values: %w", err)
+		return respErrorf(status.InvalidArgument, "can't decode input values: %w", err)
 	}
 
 	retVals := method.val.Call(toValues(ctx, argVal.Elem().Interface()))
@@ -180,7 +181,12 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 	ret := retVals[0].Interface()
 	if !retVals[1].IsNil() {
 		err := retVals[1].Interface().(error)
-		return respError(status.ErrorFromService, "error from service: %w", err)
+		if code, ok := status.FromError(err); ok {
+			// to prevent duplicate code description on client, e.g. "InvalidArgument: InvalidArgument: <errorText>"
+			errMsg := strings.TrimSuffix(err.Error(), code.String()+": ") // yes, i know
+			return respError(code, errMsg)
+		}
+		return respErrorf(status.ErrorFromService, "error from service: %w", err)
 	}
 
 	if s.streamResponse {
@@ -192,7 +198,7 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 	bodyBuf := bytes.NewBuffer(nil)
 	bodyBuf.Grow(int(retVals[0].Type().Size())) // this is not an exact size, but it can be a good hint
 	if err := s.codec.Encode(bodyBuf, ret); err != nil {
-		return respError(status.InternalError, "can't encode return values: %w", err)
+		return respErrorf(status.InternalError, "can't encode return values: %w", err)
 	}
 
 	return resp(status.OK, bodyBuf)
@@ -209,11 +215,22 @@ func resp(statusCode status.Code, body io.Reader) enc.Response {
 	return resp
 }
 
-func respError(statusCode status.Code, errorMsg string, errorMsgArgs ...any) enc.Response {
+func respError(statusCode status.Code, errorMsg string) enc.Response {
 	resp := enc.Response{
 		Metadata:   enc.Metadata{},
 		StatusCode: statusCode,
-		Error:      fx.Tern(errorMsg != "", fmt.Errorf(errorMsg, errorMsgArgs...), fmt.Errorf("code: %s", statusCode)),
+		Error:      errors.New(errorMsg),
+		Body:       nil,
+	}
+
+	return resp
+}
+
+func respErrorf(statusCode status.Code, errorMsg string, errorMsgArgs ...any) enc.Response {
+	resp := enc.Response{
+		Metadata:   enc.Metadata{},
+		StatusCode: statusCode,
+		Error:      fmt.Errorf(errorMsg, errorMsgArgs...),
 		Body:       nil,
 	}
 
