@@ -7,6 +7,7 @@ import (
 
 	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/pipe"
+	"github.com/tymbaca/srpc/status"
 )
 
 var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
@@ -56,18 +57,13 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 		return err
 	}
 
-	if connResp.StatusCode != enc.StatusOK {
-		coreErr := statusError{status: connResp.StatusCode}
-		if connResp.Error != nil || connResp.Error.Error() == "" {
-			return fmt.Errorf("%w: %s", coreErr, connResp.Error)
-		} else {
-			return fmt.Errorf("%w", coreErr)
-		}
+	if connResp.StatusCode != status.OK {
+		return status.Error(connResp.StatusCode, connResp.Error.Error()) // no wrapping, because connResp.Error always holds raw string error
 	}
 
 	err = c.codec.Decode(connResp.Body, resp)
 	if err != nil {
-		return fmt.Errorf("%w: decode response body: %w", statusError{status: enc.StatusInternalError}, err)
+		return status.Errorf(status.InternalError, "decode response body: %w", err)
 	}
 
 	return nil

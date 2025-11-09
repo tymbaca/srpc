@@ -1,9 +1,12 @@
 package enc
 
+// TODO: move to project root
+
 import (
 	"strings"
 
 	"github.com/tymbaca/srpc/pkg/fx"
+	"github.com/tymbaca/srpc/status"
 )
 
 type ServiceMethod = String // e.g. "Service.Method"
@@ -50,35 +53,4 @@ type MetadataPair struct {
 	Vals Slice[String]
 }
 
-type StatusCode uint8
-
-const (
-	StatusOK                   StatusCode = 0
-	StatusErrorFromService     StatusCode = 1 // Error from server application code
-	StatusInvalidServiceMethod StatusCode = 2
-	StatusServiceNotFound      StatusCode = 3
-	StatusMethodNotFound       StatusCode = 4
-	StatusInvalidArgument      StatusCode = 5 // Client passed invalid argument, e.g. when failed to encode/decode request body
-	StatusInternalError        StatusCode = 6 // Special case: returned by [Client.Call] when failed to decode server response body
-)
-
-func (s StatusCode) String() string {
-	switch s {
-	case StatusOK:
-		return "OK"
-	case StatusErrorFromService:
-		return "ErrorFromService"
-	case StatusInvalidServiceMethod:
-		return "InvalidServiceMethod"
-	case StatusInvalidArgument:
-		return "InvalidArgument"
-	case StatusServiceNotFound:
-		return "ServiceNotFound"
-	case StatusMethodNotFound:
-		return "MethodNotFound"
-	case StatusInternalError:
-		return "InternalError"
-	}
-
-	return ""
-}
+type StatusCode = status.Code

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tymbaca/srpc/status"
 )
 
 func TestResp(t *testing.T) {
@@ -19,7 +20,7 @@ func TestResp(t *testing.T) {
 			name: "ok with body",
 			input: Response{
 				Version:    Version{1, 0, 0},
-				StatusCode: StatusOK,
+				StatusCode: status.OK,
 				Metadata: NewMetadata(map[string][]string{
 					"k1": {"v1", "v2"},
 					"k2": {"v3", "v4"},
@@ -33,7 +34,7 @@ func TestResp(t *testing.T) {
 			name: "ok without body",
 			input: Response{
 				Version:    Version{1, 0, 0},
-				StatusCode: StatusOK,
+				StatusCode: status.OK,
 				Metadata: NewMetadata(map[string][]string{
 					"k1": {"v1", "v2"},
 					"k2": {"v3", "v4"},
@@ -47,7 +48,7 @@ func TestResp(t *testing.T) {
 			name: "ok empty buffer body",
 			input: Response{
 				Version:    Version{1, 0, 0},
-				StatusCode: StatusOK,
+				StatusCode: status.OK,
 				Metadata: NewMetadata(map[string][]string{
 					"k1": {"v1", "v2"},
 					"k2": {"v3", "v4"},
@@ -61,7 +62,7 @@ func TestResp(t *testing.T) {
 			name: "error",
 			input: Response{
 				Version:    Version{1, 0, 0},
-				StatusCode: StatusInternalError,
+				StatusCode: status.InternalError,
 				Metadata: NewMetadata(map[string][]string{
 					"k1": {"v1", "v2"},
 					"k2": {"v3", "v4"},
@@ -75,7 +76,7 @@ func TestResp(t *testing.T) {
 			name: "error with empty text",
 			input: Response{
 				Version:    Version{1, 0, 0},
-				StatusCode: StatusInternalError,
+				StatusCode: status.InternalError,
 				Metadata: NewMetadata(map[string][]string{
 					"k1": {"v1", "v2"},
 					"k2": {"v3", "v4"},
