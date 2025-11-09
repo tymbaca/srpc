@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/tymbaca/srpc/logger"
+	"github.com/tymbaca/srpc/metadata"
 	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
@@ -163,7 +164,7 @@ func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Respo
 }
 
 func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
-	ctx = ContextWithMetadata(ctx, req.Metadata.Map())
+	ctx = metadata.ToContext(ctx, req.Metadata.Map())
 
 	fx.Assert(method.val.Type().NumIn() == 2)
 	fx.Assert(method.val.Type().In(0) == reflect.TypeFor[context.Context]())
