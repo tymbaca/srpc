@@ -169,7 +169,7 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 	argVal := reflect.New(method.val.Type().In(1))
 	err := s.codec.Decode(req.Body, argVal.Interface())
 	if err != nil {
-		return respError(enc.StatusBadRequest, "can't decode input values: %w", err)
+		return respError(enc.StatusInvalidArgument, "can't decode input values: %w", err)
 	}
 
 	retVals := method.val.Call(toValues(ctx, argVal.Elem().Interface()))

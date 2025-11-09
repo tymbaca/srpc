@@ -2,17 +2,11 @@ package srpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/pipe"
-)
-
-var (
-	ErrServiceError   = errors.New("service error")
-	ErrTransportError = errors.New("transport error")
 )
 
 var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
@@ -63,20 +57,17 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	}
 
 	if connResp.StatusCode != enc.StatusOK {
-		coreErr := ErrTransportError // TODO: remove. create function srpc.StatusFromError(err), so users can check status codes
-		if connResp.StatusCode == enc.StatusErrorFromService {
-			coreErr = ErrServiceError
-		}
-		if connResp.Error != nil {
+		coreErr := statusError{status: connResp.StatusCode}
+		if connResp.Error != nil || connResp.Error.Error() == "" {
 			return fmt.Errorf("%w: %s", coreErr, connResp.Error)
 		} else {
-			return fmt.Errorf("%w: (no error message)", coreErr)
+			return fmt.Errorf("%w", coreErr)
 		}
 	}
 
 	err = c.codec.Decode(connResp.Body, resp)
 	if err != nil {
-		return fmt.Errorf("decode response body: %w", err)
+		return fmt.Errorf("%w: decode response body: %w", statusError{status: enc.StatusInternalError}, err)
 	}
 
 	return nil

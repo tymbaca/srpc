@@ -83,6 +83,7 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 		{
 			_, err := client.Divide(ctx, DivideReq{A: 10, B: 0})
 			require.Error(t, err)
+			// TODO: srpc.StatusFromError() == ErrorFromService
 		}
 		{
 			ctx := srpc.ContextWithMetadata(ctx, srpc.Metadata{

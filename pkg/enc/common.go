@@ -52,33 +52,32 @@ type MetadataPair struct {
 
 type StatusCode uint8
 
-// TODO: remove iota
 const (
-	StatusOK StatusCode = iota
-	StatusErrorFromService
-	StatusInvalidServiceMethod
-	StatusServiceNotFound
-	StatusMethodNotFound
-	StatusBadRequest
-	StatusInternalError
+	StatusOK                   StatusCode = 0
+	StatusErrorFromService     StatusCode = 1 // Error from server application code
+	StatusInvalidServiceMethod StatusCode = 2
+	StatusServiceNotFound      StatusCode = 3
+	StatusMethodNotFound       StatusCode = 4
+	StatusInvalidArgument      StatusCode = 5 // Client passed invalid argument, e.g. when failed to encode/decode request body
+	StatusInternalError        StatusCode = 6 // Special case: returned by [Client.Call] when failed to decode server response body
 )
 
 func (s StatusCode) String() string {
 	switch s {
 	case StatusOK:
-		return "StatusOK"
+		return "OK"
 	case StatusErrorFromService:
-		return "StatusErrorFromService"
+		return "ErrorFromService"
 	case StatusInvalidServiceMethod:
-		return "StatusInvalidServiceMethod"
-	case StatusBadRequest:
-		return "StatusBadRequest"
+		return "InvalidServiceMethod"
+	case StatusInvalidArgument:
+		return "InvalidArgument"
 	case StatusServiceNotFound:
-		return "StatusServiceNotFound"
+		return "ServiceNotFound"
 	case StatusMethodNotFound:
-		return "StatusMethodNotFound"
+		return "MethodNotFound"
 	case StatusInternalError:
-		return "StatusInternalError"
+		return "InternalError"
 	}
 
 	return ""
