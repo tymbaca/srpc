@@ -1,4 +1,5 @@
-package srpc
+// Package metadata provides sRPC Metadata type and helpers.
+package metadata
 
 import (
 	"context"
@@ -18,11 +19,11 @@ type Metadata map[string][]string
 
 type metadataCtxKey struct{}
 
-func MetadataFromContext(ctx context.Context) (Metadata, bool) {
-	md, ok := ctx.Value(metadataCtxKey{}).(Metadata)
-	return md, ok
+func ToContext(ctx context.Context, md Metadata) context.Context {
+	return context.WithValue(ctx, metadataCtxKey{}, md)
 }
 
-func ContextWithMetadata(ctx context.Context, md Metadata) context.Context {
-	return context.WithValue(ctx, metadataCtxKey{}, md)
+func FromContext(ctx context.Context) (Metadata, bool) {
+	md, ok := ctx.Value(metadataCtxKey{}).(Metadata)
+	return md, ok
 }

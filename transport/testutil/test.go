@@ -12,6 +12,7 @@ import (
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/logger"
+	"github.com/tymbaca/srpc/metadata"
 	"github.com/tymbaca/srpc/status"
 	"go.uber.org/goleak"
 )
@@ -96,7 +97,7 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 			require.Equal(t, status.ErrorFromService, code)
 		}
 		{
-			ctx := srpc.ContextWithMetadata(ctx, srpc.Metadata{
+			ctx := metadata.ToContext(ctx, metadata.Metadata{
 				"k1": {"v1", "v2"},
 			})
 

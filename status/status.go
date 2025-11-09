@@ -1,3 +1,4 @@
+// Package status provides sRPC status code type and helpers for error handling.
 package status
 
 import (

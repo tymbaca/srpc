@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/tymbaca/srpc/metadata"
 	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
@@ -36,7 +37,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	_, cancel := closeOnCancel(ctx, conn)
 	defer cancel()
 
-	md, _ := MetadataFromContext(ctx)
+	md, _ := metadata.FromContext(ctx)
 	encReq := enc.Request{
 		ServiceMethod: enc.NewString(serviceMethod),
 		Metadata:      enc.NewMetadata(md),
