@@ -1,6 +1,8 @@
 package testutil
 
 import (
+	"context"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -10,10 +12,16 @@ import (
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/logger"
+	"github.com/tymbaca/srpc/status"
 	"go.uber.org/goleak"
 )
 
+func goleakVerify(t *testing.T) {
+	goleak.VerifyNone(t, goleak.IgnoreCurrent(), goleak.IgnoreTopFunction("github.com/tymbaca/srpc/transport/testutil.(*TestServiceServer).LongAdd"))
+}
+
 func TestSimple(t *testing.T, newListener func() srpc.Listener, newDialer func() srpc.Dialer) {
+	defer goleakVerify(t)
 	ctx := t.Context()
 
 	dialer := newDialer()
@@ -41,8 +49,8 @@ func TestSimple(t *testing.T, newListener func() srpc.Listener, newDialer func()
 }
 
 func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func() srpc.Dialer, clientCount, callPerClient int) {
+	defer goleakVerify(t)
 	ctx := t.Context()
-	defer goleak.VerifyNone(t)
 
 	t.Run("single client", func(t *testing.T) {
 		listener := newListener()
@@ -54,6 +62,133 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 		resp, err := client.Add(ctx, AddReq{A: 10, B: 15})
 		require.NoError(t, err)
 		require.Equal(t, 25, resp.Result)
+	})
+
+	t.Run("single client, different methods", func(t *testing.T) {
+		listener := newListener()
+		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		defer server.Close()
+		go server.Start(ctx, listener)
+
+		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, newDialer()))
+		{
+			resp, err := client.Add(ctx, AddReq{A: 10, B: 15})
+			require.NoError(t, err)
+			require.Equal(t, 25, resp.Result)
+		}
+		{
+			resp, err := client.Divide(ctx, DivideReq{A: 10, B: 2})
+			require.NoError(t, err)
+			require.Equal(t, 5, resp.Result)
+		}
+		{
+			_, err := client.Divide(ctx, DivideReq{A: 10, B: 0})
+			require.Error(t, err)
+			code, ok := status.FromError(err)
+			require.True(t, ok)
+			require.Equal(t, status.InvalidArgument, code)
+		}
+		{
+			_, err := client.Divide(ctx, DivideReq{A: 10, B: -1})
+			require.Error(t, err)
+			code, ok := status.FromError(err)
+			require.True(t, ok)
+			require.Equal(t, status.ErrorFromService, code)
+		}
+		{
+			ctx := srpc.ContextWithMetadata(ctx, srpc.Metadata{
+				"k1": {"v1", "v2"},
+			})
+
+			resp, err := client.ReplyMD(ctx, ReplyMDReq{Key: "k1"})
+			require.NoError(t, err)
+			require.Equal(t, ReplyMDResp{Vals: []string{"v1", "v2"}, Ok: true}, resp)
+
+			resp, err = client.ReplyMD(ctx, ReplyMDReq{Key: "badkey"})
+			require.NoError(t, err)
+			require.Equal(t, ReplyMDResp{Ok: false}, resp)
+		}
+	})
+
+	ctxCancelErrMsg := func(wait, waitCheck, dur time.Duration) string {
+		return fmt.Sprintf("exit after context cancelation was too long, ctx canceled after %s, function took %s to exit (limit was %s)", wait, dur-wait, waitCheck-wait)
+	}
+
+	t.Run("single client, context check", func(t *testing.T) {
+		listener := newListener()
+		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		defer server.Close()
+		go server.Start(ctx, listener)
+
+		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, newDialer()))
+		wait := 20 * time.Millisecond
+		waitCheck := 25 * time.Millisecond
+		t.Run("timeout", func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(ctx, wait)
+			defer cancel()
+
+			start := time.Now()
+			_, err := client.LongAdd(ctx, AddReq{A: 10, B: 15})
+			dur := time.Since(start)
+			require.Error(t, err)
+			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
+		})
+
+		t.Run("cancel", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			go func() {
+				select {
+				case <-ctx.Done():
+				case <-time.After(wait):
+					cancel()
+				}
+			}()
+
+			start := time.Now()
+			_, err := client.LongAdd(ctx, AddReq{A: 10, B: 15})
+			dur := time.Since(start)
+
+			require.Error(t, err)
+			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
+		})
+	})
+
+	t.Run("server, context check", func(t *testing.T) {
+		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		defer server.Close()
+
+		wait := 20 * time.Millisecond
+		waitCheck := 25 * time.Millisecond
+		t.Run("timeout", func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(ctx, wait)
+			defer cancel()
+
+			start := time.Now()
+			err := server.Start(ctx, newListener())
+			dur := time.Since(start)
+			require.NoError(t, err)
+			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
+		})
+		t.Run("cancel", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			go func() {
+				select {
+				case <-ctx.Done():
+				case <-time.After(wait):
+					cancel()
+				}
+			}()
+
+			start := time.Now()
+			err := server.Start(ctx, newListener())
+			dur := time.Since(start)
+			require.NoError(t, err)
+			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
+		})
 	})
 
 	t.Run("multiple clients parallel each multiple calls", func(t *testing.T) {

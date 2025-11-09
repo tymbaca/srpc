@@ -2,17 +2,12 @@ package srpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 
 	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/pipe"
-)
-
-var (
-	ErrServiceError   = errors.New("service error")
-	ErrTransportError = errors.New("transport error")
+	"github.com/tymbaca/srpc/status"
 )
 
 var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
@@ -33,19 +28,18 @@ type Client struct {
 	connector Dialer
 }
 
-// TODO: check metadata in context
-// TODO: timeouts? > but we support context
-
 func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {
 	conn, err := c.connector.Dial(ctx, c.addr)
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
-	defer conn.Close() // TODO: ctx -> close
+	_, cancel := closeOnCancel(ctx, conn)
+	defer cancel()
 
+	md, _ := MetadataFromContext(ctx)
 	encReq := enc.Request{
 		ServiceMethod: enc.NewString(serviceMethod),
-		Metadata:      enc.Metadata{}, // TODO:
+		Metadata:      enc.NewMetadata(md),
 		Body: pipe.ToReader(func(w io.Writer) error {
 			return c.codec.Encode(w, req)
 		}),
@@ -61,21 +55,17 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 		return err
 	}
 
-	if connResp.StatusCode != enc.StatusOK {
-		coreErr := ErrTransportError // TODO: remove. create function srpc.StatusFromError(err), so users can check status codes
-		if connResp.StatusCode == enc.StatusErrorFromService {
-			coreErr = ErrServiceError
+	if connResp.StatusCode != status.OK {
+		errMsg := connResp.Error.Error()
+		if errMsg == "" {
+			errMsg = "(no error descroption)"
 		}
-		if connResp.Error != nil {
-			return fmt.Errorf("%w: %s", coreErr, connResp.Error)
-		} else {
-			return fmt.Errorf("%w: (no error message)", coreErr)
-		}
+		return status.Error(connResp.StatusCode, errMsg) // no wrapping, because connResp.Error always holds raw string error
 	}
 
 	err = c.codec.Decode(connResp.Body, resp)
 	if err != nil {
-		return fmt.Errorf("decode response body: %w", err)
+		return status.Errorf(status.InternalError, "decode response body: %w", err)
 	}
 
 	return nil

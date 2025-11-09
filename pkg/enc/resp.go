@@ -9,6 +9,7 @@ import (
 
 	"github.com/tymbaca/sbinary"
 	"github.com/tymbaca/srpc/pkg/chunked"
+	"github.com/tymbaca/srpc/status"
 )
 
 type Response struct {
@@ -33,7 +34,7 @@ func ReadResponse(c Context, r io.Reader) (Response, error) {
 		return Response{}, fmt.Errorf("decode response header: %w", err)
 	}
 
-	if resp.StatusCode == StatusOK {
+	if resp.StatusCode == status.OK {
 		resp.Body = cr
 	} else {
 		errBytes, err := io.ReadAll(cr)

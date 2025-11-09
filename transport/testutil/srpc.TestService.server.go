@@ -5,8 +5,10 @@ package testutil
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/status"
 )
 
 func NewTestServiceServer(s *srpc.Server) *TestServiceServer {
@@ -27,10 +29,28 @@ func (s *TestServiceServer) Add(ctx context.Context, req AddReq) (AddResp, error
 	return AddResp{req.A + req.B}, nil
 }
 
+func (s *TestServiceServer) LongAdd(ctx context.Context, req AddReq) (AddResp, error) {
+	time.Sleep(1 * time.Second)
+	return AddResp{req.A + req.B}, nil
+}
+
 func (s *TestServiceServer) Divide(ctx context.Context, req DivideReq) (DivideResp, error) {
+	if req.B == -1 {
+		return DivideResp{}, errors.New("i don't want to divide by -1")
+	}
 	if req.B == 0 {
-		return DivideResp{}, errors.New("can't divide to 0")
+		return DivideResp{}, status.Error(status.InvalidArgument, "can't divide to 0")
 	}
 
 	return DivideResp{req.A / req.B}, nil
+}
+
+func (s *TestServiceServer) ReplyMD(ctx context.Context, req ReplyMDReq) (ReplyMDResp, error) {
+	md, ok := srpc.MetadataFromContext(ctx)
+	if !ok {
+		return ReplyMDResp{Ok: false}, nil
+	}
+
+	val, ok := md[req.Key]
+	return ReplyMDResp{Vals: val, Ok: ok}, nil
 }

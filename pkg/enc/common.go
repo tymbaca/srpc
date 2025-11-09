@@ -1,9 +1,12 @@
 package enc
 
+// TODO: move to project root
+
 import (
 	"strings"
 
 	"github.com/tymbaca/srpc/pkg/fx"
+	"github.com/tymbaca/srpc/status"
 )
 
 type ServiceMethod = String // e.g. "Service.Method"
@@ -20,6 +23,10 @@ func (sm ServiceMethod) Split() (service string, method string, ok bool) {
 type Metadata Slice[MetadataPair]
 
 func NewMetadata(m map[string][]string) Metadata {
+	if len(m) == 0 {
+		return Metadata{}
+	}
+
 	pairs := make([]MetadataPair, 0, len(m))
 
 	for k, vals := range m {
@@ -46,36 +53,4 @@ type MetadataPair struct {
 	Vals Slice[String]
 }
 
-type StatusCode uint8
-
-// TODO: remove iota
-const (
-	StatusOK StatusCode = iota
-	StatusErrorFromService
-	StatusInvalidServiceMethod
-	StatusServiceNotFound
-	StatusMethodNotFound
-	StatusBadRequest
-	StatusInternalError
-)
-
-func (s StatusCode) String() string {
-	switch s {
-	case StatusOK:
-		return "StatusOK"
-	case StatusErrorFromService:
-		return "StatusErrorFromService"
-	case StatusInvalidServiceMethod:
-		return "StatusInvalidServiceMethod"
-	case StatusBadRequest:
-		return "StatusBadRequest"
-	case StatusServiceNotFound:
-		return "StatusServiceNotFound"
-	case StatusMethodNotFound:
-		return "StatusMethodNotFound"
-	case StatusInternalError:
-		return "StatusInternalError"
-	}
-
-	return ""
-}
+type StatusCode = status.Code

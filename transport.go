@@ -13,13 +13,24 @@ type Dialer interface {
 // ErrListenerClosed returned by [Listener.Accept] when listener is closed.
 var ErrListenerClosed = errors.New("listener is closed")
 
+// ErrListenerBadClose can be returned by [Listener.Accept] when listener closed with error.
+var ErrListenerBadClose = errors.New("listener is closed with error")
+
 // Listener accepts incoming connections.
 //
 // Multiple goroutines may invoke methods on a Listener simultaneously.
 type Listener interface {
 	// Accept waits and returns new connection to the listener.
-	// If Listener got closed Accept must return [ErrListenerClosed],
-	// including Accept calls that didn't returned yet.
+	// If Listener got closed with [Listener.Close] Accept must
+	// return [ErrListenerClosed]. including Accept calls that
+	// didn't returned yet. The [Server.Start] will exit with nil after that.
+	//
+	// Implementation can also return [ErrListenerBadClose]. In that case
+	// [Server.Start] will exit with provided error (including other errors
+	// that wrap it).
+	//
+	// Other returned errors will be logged by the server
+	// and then it will call Accept again.
 	Accept() (Conn, error)
 
 	// Close closes the listener.
