@@ -1,4 +1,10 @@
+// Package fx provides commond utility funcitons
 package fx
+
+import (
+	"context"
+	"io"
+)
 
 func Assert(cond bool) {
 	if !cond {
@@ -21,4 +27,13 @@ func Map[A, B any](input []A, conv func(a A) B) []B {
 	}
 
 	return output
+}
+
+func CloseOnCancel(ctx context.Context, c io.Closer) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		<-ctx.Done()
+		c.Close()
+	}()
+	return ctx, cancel
 }

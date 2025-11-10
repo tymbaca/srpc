@@ -80,21 +80,12 @@ func RegisterWithName[T any](s *Server, impl T, name string) {
 	s.services[name] = service
 }
 
-func closeOnCancel(ctx context.Context, c io.Closer) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(ctx)
-	go func() {
-		<-ctx.Done()
-		c.Close()
-	}()
-	return ctx, cancel
-}
-
 // Start starts server with provided listener. It blocks until server (listener) get closed.
 // In normal scenario, if [Server.Close] was called, Start will exit with nil.
 // See [Listener.Accept] for details.
 func (s *Server) Start(ctx context.Context, l Listener) error {
 	s.l = l
-	ctx, cancel := closeOnCancel(ctx, s)
+	ctx, cancel := fx.CloseOnCancel(ctx, s)
 	defer cancel()
 
 	for {
@@ -111,7 +102,7 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 		}
 
 		go func() {
-			ctx, cancel := closeOnCancel(ctx, conn)
+			ctx, cancel := fx.CloseOnCancel(ctx, conn)
 			defer cancel()
 
 			err := s.handleConn(ctx, conn)

@@ -47,6 +47,7 @@ func (s *TestServiceServer) Divide(ctx context.Context, req DivideReq) (DivideRe
 }
 
 func (s *TestServiceServer) ReplyMD(ctx context.Context, req ReplyMDReq) (ReplyMDResp, error) {
+	respMd := metadata.ResponseFromContext()
 	md, ok := metadata.FromContext(ctx)
 	if !ok {
 		return ReplyMDResp{Ok: false}, nil

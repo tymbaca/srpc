@@ -7,6 +7,7 @@ import (
 
 	"github.com/tymbaca/srpc/metadata"
 	"github.com/tymbaca/srpc/pkg/enc"
+	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
 )
@@ -34,7 +35,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
-	_, cancel := closeOnCancel(ctx, conn)
+	_, cancel := fx.CloseOnCancel(ctx, conn)
 	defer cancel()
 
 	md, _ := metadata.FromContext(ctx)
@@ -43,10 +44,21 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 		Metadata:      enc.NewMetadata(md),
 		Body: pipe.ToReader(func(w io.Writer) error {
 			return c.codec.Encode(w, req)
-		}),
+		}), // WARN: leaking goroutine?
 	}
 
-	err = enc.WriteRequest(c.enc, conn, encReq)
+	callSuite := callSuite{
+		ctx:          ctx,
+		req:          encReq,
+		conn:         conn,
+		respMetadata: nil,
+	}
+
+	for _, opt := range getCallOptions(ctx) {
+		opt(&callSuite)
+	}
+
+	err = enc.WriteRequest(c.enc, callSuite.conn, callSuite.req)
 	if err != nil {
 		return err
 	}
@@ -56,12 +68,16 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 		return err
 	}
 
+	if callSuite.respMetadata != nil {
+		*callSuite.respMetadata = connResp.Metadata.Map()
+	}
+
 	if connResp.StatusCode != status.OK {
 		errMsg := connResp.Error.Error()
 		if errMsg == "" {
-			errMsg = "(no error descroption)"
+			return status.ErrorOnlyCode(connResp.StatusCode)
 		}
-		return status.Error(connResp.StatusCode, errMsg) // no wrapping, because connResp.Error always holds raw string error
+		return status.Error(connResp.StatusCode, errMsg)
 	}
 
 	err = c.codec.Decode(connResp.Body, resp)
