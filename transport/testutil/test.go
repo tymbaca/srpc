@@ -154,6 +154,13 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 			require.Error(t, err)
 			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
 		})
+		t.Run("already closed", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(ctx)
+			cancel()
+
+			_, err := client.LongAdd(ctx, AddReq{A: 10, B: 15})
+			require.Error(t, err)
+		})
 	})
 
 	t.Run("server, context check", func(t *testing.T) {
@@ -189,6 +196,13 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 			dur := time.Since(start)
 			require.NoError(t, err)
 			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
+		})
+		t.Run("already canceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(ctx)
+			cancel()
+
+			err := server.Start(ctx, newListener())
+			require.NoError(t, err)
 		})
 	})
 

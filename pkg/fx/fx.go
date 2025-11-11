@@ -37,3 +37,9 @@ func CloseOnCancel(ctx context.Context, c io.Closer) (context.Context, context.C
 	}()
 	return ctx, cancel
 }
+
+func CloseIfCloser(v any) {
+	if c, ok := v.(io.Closer); ok {
+		c.Close()
+	}
+}

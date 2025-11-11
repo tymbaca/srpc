@@ -4,7 +4,7 @@ import (
 	"io"
 )
 
-func ToReader(fn func(w io.Writer) error) io.Reader {
+func ToReader(fn func(w io.Writer) error) io.ReadCloser {
 	r, w := io.Pipe()
 
 	go func() {
