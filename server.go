@@ -15,6 +15,7 @@ import (
 	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
+	"github.com/tymbaca/srpc/transport"
 )
 
 func NewServer(codec Codec, opts ...ServerOption) *Server {
@@ -40,7 +41,7 @@ type Server struct {
 	streamResponse bool
 
 	services map[string]service
-	l        Listener
+	l        transport.Listener
 }
 
 type service struct {
@@ -82,18 +83,18 @@ func RegisterWithName[T any](s *Server, impl T, name string) {
 
 // Start starts server with provided listener. It blocks until server (listener) get closed.
 // In normal scenario, if [Server.Close] was called, Start will exit with nil.
-// See [Listener.Accept] for details.
-func (s *Server) Start(ctx context.Context, l Listener) error {
+// See [transport.Listener.Accept] for details.
+func (s *Server) Start(ctx context.Context, l transport.Listener) error {
 	s.l = l
 	ctx, cancel := fx.CloseOnCancel(ctx, s)
 	defer cancel()
 
 	for {
 		conn, err := s.l.Accept()
-		if errors.Is(err, ErrListenerClosed) {
+		if errors.Is(err, transport.ErrListenerClosed) {
 			return nil
 		}
-		if errors.Is(err, ErrListenerBadClose) {
+		if errors.Is(err, transport.ErrListenerBadClose) {
 			return err
 		}
 		if err != nil {
@@ -123,7 +124,7 @@ func (s *Server) Close() error {
 	return nil
 }
 
-func (s *Server) handleConn(ctx context.Context, conn Conn) (err error) {
+func (s *Server) handleConn(ctx context.Context, conn transport.Conn) (err error) {
 	req, err := enc.ReadRequest(s.enc, conn)
 	if err != nil {
 		return err

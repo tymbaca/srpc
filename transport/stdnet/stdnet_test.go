@@ -3,7 +3,7 @@ package stdnet
 import (
 	"testing"
 
-	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/transport"
 	"github.com/tymbaca/srpc/transport/testutil"
 )
 
@@ -31,8 +31,8 @@ func BenchmarkStress(b *testing.B) {
 	b.Run("unix", func(b *testing.B) { testutil.Benchmark(b, newListenerFunc("unix", unixAddr), newDialerFunc("unix")) })
 }
 
-func newListenerFunc(network string, addr string) func() srpc.Listener {
-	return func() srpc.Listener {
+func newListenerFunc(network string, addr string) func() transport.Listener {
+	return func() transport.Listener {
 		l, err := Listen(network, addr)
 		if err != nil {
 			panic(err)
@@ -41,8 +41,8 @@ func newListenerFunc(network string, addr string) func() srpc.Listener {
 	}
 }
 
-func newDialerFunc(network string) func() srpc.Dialer {
-	return func() srpc.Dialer {
+func newDialerFunc(network string) func() transport.Dialer {
+	return func() transport.Dialer {
 		return NewDialer(network)
 	}
 }

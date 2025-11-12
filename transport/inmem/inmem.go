@@ -10,7 +10,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/transport"
 )
 
 var ErrPeerNotFound = errors.New("peer not found")
@@ -80,12 +80,12 @@ type PeerListener struct {
 }
 
 // Accept implements [srpc.Listerner].
-func (pl *PeerListener) Accept() (srpc.Conn, error) {
+func (pl *PeerListener) Accept() (transport.Conn, error) {
 	debug("wait for conn on inbox, peer: %+v", pl.parent)
 
 	select {
 	case <-pl.ctx.Done():
-		return nil, srpc.ErrListenerClosed
+		return nil, transport.ErrListenerClosed
 	case conn := <-pl.parent.inbox:
 		return conn, nil
 	}
@@ -102,7 +102,7 @@ func (pl *PeerListener) Addr() string {
 	return pl.parent.addr
 }
 
-func (p *Peer) Dial(ctx context.Context, addr string) (srpc.Conn, error) {
+func (p *Peer) Dial(ctx context.Context, addr string) (transport.Conn, error) {
 	target := p.cluster.getPeer(addr)
 	if target == nil {
 		return nil, ErrPeerNotFound

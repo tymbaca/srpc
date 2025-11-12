@@ -5,10 +5,10 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/tymbaca/srpc"
+	transport "github.com/tymbaca/srpc/transport"
 )
 
-func NewListenerRandomKey(backing srpc.Listener) (*Listener, error) {
+func NewListenerRandomKey(backing transport.Listener) (*Listener, error) {
 	key, err := _curve.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
@@ -17,7 +17,7 @@ func NewListenerRandomKey(backing srpc.Listener) (*Listener, error) {
 	return NewListener(backing, key)
 }
 
-func NewListener(backing srpc.Listener, key *ecdh.PrivateKey) (*Listener, error) {
+func NewListener(backing transport.Listener, key *ecdh.PrivateKey) (*Listener, error) {
 	if key.Curve() != _curve {
 		return nil, fmt.Errorf("invalid key curve: got %s, must be %s", key.Curve(), _curve)
 	}
@@ -29,14 +29,14 @@ func NewListener(backing srpc.Listener, key *ecdh.PrivateKey) (*Listener, error)
 }
 
 type Listener struct {
-	backing srpc.Listener
+	backing transport.Listener
 	key     *ecdh.PrivateKey
 }
 
 // Accept waits and returns new connection to the listener.
 // If Listener got closed Accept must return [ErrListenerClosed],
 // including Accept calls that didn't returned yet.
-func (l *Listener) Accept() (srpc.Conn, error) {
+func (l *Listener) Accept() (transport.Conn, error) {
 	conn, err := l.backing.Accept()
 	if err != nil {
 		return nil, err

@@ -6,14 +6,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tymbaca/srpc"
+	transport "github.com/tymbaca/srpc/transport"
 	"github.com/tymbaca/srpc/transport/inmem"
 	"github.com/tymbaca/srpc/transport/testutil"
 	"golang.org/x/crypto/chacha20"
 )
 
-func newListener(c *inmem.Cluster) func() srpc.Listener {
-	return func() srpc.Listener {
+func newListener(c *inmem.Cluster) func() transport.Listener {
+	return func() transport.Listener {
 		l, err := NewListenerRandomKey(c.NewPeer().Listen())
 		if err != nil {
 			panic(err)
@@ -22,8 +22,8 @@ func newListener(c *inmem.Cluster) func() srpc.Listener {
 	}
 }
 
-func newDialer(c *inmem.Cluster) func() srpc.Dialer {
-	return func() srpc.Dialer {
+func newDialer(c *inmem.Cluster) func() transport.Dialer {
+	return func() transport.Dialer {
 		d, err := NewDialerRandomKey(c.NewPeer())
 		if err != nil {
 			panic(err)

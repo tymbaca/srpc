@@ -11,11 +11,12 @@ import (
 	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
+	"github.com/tymbaca/srpc/transport"
 )
 
 var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
 
-func NewClient(addr string, codec Codec, connector Dialer) *Client {
+func NewClient(addr string, codec Codec, connector transport.Dialer) *Client {
 	return &Client{
 		addr:      addr,
 		enc:       enc.Context{Version: encVersion, IgnoreVersion: false},
@@ -28,7 +29,7 @@ type Client struct {
 	addr      string
 	enc       enc.Context
 	codec     Codec
-	connector Dialer
+	connector transport.Dialer
 }
 
 func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {

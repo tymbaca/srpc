@@ -14,6 +14,7 @@ import (
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
 	"github.com/tymbaca/srpc/status"
+	"github.com/tymbaca/srpc/transport"
 	"go.uber.org/goleak"
 )
 
@@ -21,7 +22,7 @@ func goleakVerify(t *testing.T) {
 	goleak.VerifyNone(t, goleak.IgnoreCurrent(), goleak.IgnoreTopFunction("github.com/tymbaca/srpc/transport/testutil.(*TestServiceServer).LongAdd"))
 }
 
-func TestSimple(t *testing.T, newListener func() srpc.Listener, newDialer func() srpc.Dialer) {
+func TestSimple(t *testing.T, newListener func() transport.Listener, newDialer func() transport.Dialer) {
 	defer goleakVerify(t)
 	ctx := t.Context()
 
@@ -49,7 +50,7 @@ func TestSimple(t *testing.T, newListener func() srpc.Listener, newDialer func()
 	}
 }
 
-func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func() srpc.Dialer, clientCount, callPerClient int) {
+func TestStress(t *testing.T, newListener func() transport.Listener, newDialer func() transport.Dialer, clientCount, callPerClient int) {
 	defer goleakVerify(t)
 	ctx := t.Context()
 
@@ -254,7 +255,7 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 	})
 }
 
-func Benchmark(b *testing.B, newListener func() srpc.Listener, newDialer func() srpc.Dialer) {
+func Benchmark(b *testing.B, newListener func() transport.Listener, newDialer func() transport.Dialer) {
 	ctx := b.Context()
 	dialer := newDialer()
 	listener := newListener()

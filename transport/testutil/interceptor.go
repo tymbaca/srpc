@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 
-	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/transport"
 )
 
-func NewDialInterceptor(dialer srpc.Dialer) (*InterceptorDialer, *InterceptorConn) {
+func NewDialInterceptor(dialer transport.Dialer) (*InterceptorDialer, *InterceptorConn) {
 	interceptor := &InterceptorConn{
 		WData: &bytes.Buffer{},
 		RData: &bytes.Buffer{},
@@ -23,10 +23,10 @@ func NewDialInterceptor(dialer srpc.Dialer) (*InterceptorDialer, *InterceptorCon
 
 type InterceptorDialer struct {
 	interceptor *InterceptorConn
-	srpc.Dialer
+	transport.Dialer
 }
 
-func (d *InterceptorDialer) Dial(ctx context.Context, addr string) (srpc.Conn, error) {
+func (d *InterceptorDialer) Dial(ctx context.Context, addr string) (transport.Conn, error) {
 	conn, err := d.Dialer.Dial(ctx, addr)
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func (d *InterceptorDialer) Dial(ctx context.Context, addr string) (srpc.Conn, e
 type InterceptorConn struct {
 	WData *bytes.Buffer
 	RData *bytes.Buffer
-	srpc.Conn
+	transport.Conn
 }
 
 func (c *InterceptorConn) Read(p []byte) (n int, err error) {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/transport"
 )
 
 // Listen creates new [Listener] with provided network and address.
@@ -31,10 +31,10 @@ func (l *Listener) Addr() string {
 // Accept waits and returns new connection to the listener.
 // If Listener got closed Accept must return [ErrListenerClosed],
 // including Accept calls that didn't returned yet.
-func (l *Listener) Accept() (srpc.Conn, error) {
+func (l *Listener) Accept() (transport.Conn, error) {
 	conn, err := l.l.Accept()
 	if errors.Is(err, net.ErrClosed) {
-		return nil, srpc.ErrListenerClosed
+		return nil, transport.ErrListenerClosed
 	}
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ type Dialer struct {
 }
 
 // Dial dials to addr using d.network.
-func (d *Dialer) Dial(ctx context.Context, addr string) (srpc.Conn, error) {
+func (d *Dialer) Dial(ctx context.Context, addr string) (transport.Conn, error) {
 	var dd net.Dialer
 	conn, err := dd.DialContext(ctx, d.network, addr)
 	if err != nil {
@@ -71,7 +71,7 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (srpc.Conn, error) {
 	return &Conn{c: conn}, nil
 }
 
-// Conn implements [srpc.Conn]
+// Conn implements [transport.Conn]
 type Conn struct {
 	c net.Conn
 }
