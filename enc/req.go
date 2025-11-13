@@ -40,8 +40,10 @@ func ReadRequest(c Context, r io.Reader) (Request, error) {
 // In future, chunked io will be needed for dynamically filled readers.
 func WriteRequest(c Context, w io.Writer, req Request) error {
 	req.Version = c.Version
-	cw := chunked.NewBufferWriter(w)
-	defer cw.Close()
+	cw := chunked.NewWriter(w)
+	defer cw.Close() // FIX: handle error
+	// TODO: uncomment?
+	// defer fx.CloseIfCloser(req.Body) // if body is pipe.ToReader we need to kill it's goroutine, in case if error happens and we exit before EOF
 
 	if err := writeVersion(cw, req.Version); err != nil {
 		return err

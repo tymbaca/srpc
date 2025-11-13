@@ -65,7 +65,7 @@ func TestInside(t *testing.T) {
 	clientPeer := cluster.NewPeer()
 	serverPeer := cluster.NewPeer()
 
-	interceptorDialer, interceptor := testutil.NewDialInterceptor(clientPeer)
+	interceptorDialer, interceptor := testutil.NewInterceptorDialer(clientPeer)
 
 	dialer, err := NewDialerRandomKey(interceptorDialer)
 	require.NoError(t, err)

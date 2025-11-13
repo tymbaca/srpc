@@ -53,8 +53,8 @@ func ReadResponse(c Context, r io.Reader) (Response, error) {
 // See [WriteRequest].
 func WriteResponse(c Context, w io.Writer, resp Response) error {
 	resp.Version = c.Version
-	cw := chunked.NewBufferWriter(w)
-	defer cw.Close()
+	cw := chunked.NewWriter(w)
+	defer cw.Close()                  // FIX: handle error
 	defer fx.CloseIfCloser(resp.Body) // if body is pipe.ToReader we need to kill it's goroutine, in case if error happens and we exit before EOF
 
 	if err := writeVersion(cw, resp.Version); err != nil {

@@ -7,7 +7,7 @@ import (
 	"github.com/tymbaca/srpc/transport"
 )
 
-func NewDialInterceptor(dialer transport.Dialer) (*InterceptorDialer, *InterceptorConn) {
+func NewInterceptorDialer(dialer transport.Dialer) (*InterceptorDialer, *InterceptorConn) {
 	interceptor := &InterceptorConn{
 		WData: &bytes.Buffer{},
 		RData: &bytes.Buffer{},
