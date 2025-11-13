@@ -146,17 +146,17 @@ func (s *Server) handleConn(ctx context.Context, conn transport.Conn) (err error
 func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Response) {
 	serviceName, methodName, ok := req.ServiceMethod.Split()
 	if !ok {
-		return respErrorf(status.InvalidServiceMethod, "")
+		return respErrorf(nil, status.InvalidServiceMethod, "")
 	}
 
 	service, ok := s.services[serviceName]
 	if !ok {
-		return respErrorf(status.ServiceNotFound, "")
+		return respErrorf(nil, status.ServiceNotFound, "")
 	}
 
 	method, ok := service.methods[methodName]
 	if !ok {
-		return respErrorf(status.MethodNotFound, "")
+		return respErrorf(nil, status.MethodNotFound, "")
 	}
 
 	return s.call(method, ctx, req)
@@ -165,10 +165,13 @@ func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Respo
 func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
 	ctx = metadata.ToContext(ctx, req.Metadata.Map())
 
+	var respMD metadata.Metadata
+	ctx = metadata.ResponseToContext(ctx, &respMD)
+
 	argVal := reflect.New(method.val.Type().In(1))
 	err := s.codec.Decode(req.Body, argVal.Interface())
 	if err != nil {
-		return respErrorf(status.InvalidArgument, "can't decode input values: %w", err)
+		return respErrorf(respMD, status.InvalidArgument, "can't decode input values: %w", err)
 	}
 
 	retVals := method.val.Call(toValues(ctx, argVal.Elem().Interface()))
@@ -179,13 +182,13 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 		if code, ok := status.FromError(err); ok {
 			// to prevent duplicate code description on client, e.g. "InvalidArgument: InvalidArgument: <errorText>"
 			errMsg := strings.TrimSuffix(err.Error(), code.String()+": ") // (yes, i know)
-			return respError(code, errMsg)
+			return respError(respMD, code, errMsg)
 		}
-		return respErrorf(status.ErrorFromService, "error from service: %w", err)
+		return respErrorf(respMD, status.ErrorFromService, "error from service: %w", err)
 	}
 
 	if s.streamResponse {
-		return resp(status.OK,
+		return resp(respMD, status.OK,
 			pipe.ToReader(func(w io.Writer) error { return s.codec.Encode(w, ret) }),
 		)
 	}
@@ -193,15 +196,15 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 	bodyBuf := bytes.NewBuffer(nil)
 	bodyBuf.Grow(int(retVals[0].Type().Size())) // this is not an exact size, but it can be a good hint
 	if err := s.codec.Encode(bodyBuf, ret); err != nil {
-		return respErrorf(status.InternalError, "can't encode return values: %w", err)
+		return respErrorf(respMD, status.InternalError, "can't encode return values: %w", err)
 	}
 
-	return resp(status.OK, bodyBuf)
+	return resp(respMD, status.OK, bodyBuf)
 }
 
-func resp(statusCode status.Code, body io.Reader) enc.Response {
+func resp(md metadata.Metadata, statusCode status.Code, body io.Reader) enc.Response {
 	resp := enc.Response{
-		Metadata:   enc.Metadata{},
+		Metadata:   enc.NewMetadata(md),
 		StatusCode: statusCode,
 		Error:      nil,
 		Body:       body,
@@ -210,9 +213,9 @@ func resp(statusCode status.Code, body io.Reader) enc.Response {
 	return resp
 }
 
-func respError(statusCode status.Code, errorMsg string) enc.Response {
+func respError(md metadata.Metadata, statusCode status.Code, errorMsg string) enc.Response {
 	resp := enc.Response{
-		Metadata:   enc.Metadata{},
+		Metadata:   enc.NewMetadata(md),
 		StatusCode: statusCode,
 		Error:      errors.New(errorMsg),
 		Body:       nil,
@@ -221,9 +224,9 @@ func respError(statusCode status.Code, errorMsg string) enc.Response {
 	return resp
 }
 
-func respErrorf(statusCode status.Code, errorMsg string, errorMsgArgs ...any) enc.Response {
+func respErrorf(md metadata.Metadata, statusCode status.Code, errorMsg string, errorMsgArgs ...any) enc.Response {
 	resp := enc.Response{
-		Metadata:   enc.Metadata{},
+		Metadata:   enc.NewMetadata(md),
 		StatusCode: statusCode,
 		Error:      fmt.Errorf(errorMsg, errorMsgArgs...),
 		Body:       nil,

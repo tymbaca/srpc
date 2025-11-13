@@ -28,9 +28,17 @@ func FromContext(ctx context.Context) (Metadata, bool) {
 
 type respMetadataCtxKey struct{}
 
-// ResponseFromContext returns a pointer to metadata. It can be used in server-side service
-// implementation methods to fill response metadata. Client will receive it when using [srpc.WithResponseMetadata] call option.
+// ResponseFromContext returns a pointer to outgoing response metadata. It can be used
+// in server-side service implementation methods to fill outgoing metadata. If called
+// from server-side service implementation methods the pointer would always be non-nil.
+// Client can receive it by using [srpc.WithResponseMetadata] call option.
 func ResponseFromContext(ctx context.Context) *Metadata {
 	md, _ := ctx.Value(respMetadataCtxKey{}).(*Metadata)
 	return md
+}
+
+// ResponseToContext is for internal use. It puts pointer to response data
+// into the context. Then it can be retrieved by [ResponseFromContext].
+func ResponseToContext(ctx context.Context, md *Metadata) context.Context {
+	return context.WithValue(ctx, respMetadataCtxKey{}, md)
 }
