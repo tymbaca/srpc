@@ -6,10 +6,10 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/tymbaca/srpc"
+	transport "github.com/tymbaca/srpc/transport"
 )
 
-func NewDialerRandomKey(backing srpc.Dialer) (*Dialer, error) {
+func NewDialerRandomKey(backing transport.Dialer) (*Dialer, error) {
 	key, err := _curve.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
@@ -18,7 +18,7 @@ func NewDialerRandomKey(backing srpc.Dialer) (*Dialer, error) {
 	return NewDialer(backing, key)
 }
 
-func NewDialer(backing srpc.Dialer, key *ecdh.PrivateKey) (*Dialer, error) {
+func NewDialer(backing transport.Dialer, key *ecdh.PrivateKey) (*Dialer, error) {
 	if key.Curve() != _curve {
 		return nil, fmt.Errorf("invalid key curve: got %s, must be %s", key.Curve(), _curve)
 	}
@@ -30,11 +30,11 @@ func NewDialer(backing srpc.Dialer, key *ecdh.PrivateKey) (*Dialer, error) {
 }
 
 type Dialer struct {
-	backing srpc.Dialer
+	backing transport.Dialer
 	key     *ecdh.PrivateKey
 }
 
-func (d *Dialer) Dial(ctx context.Context, addr string) (srpc.Conn, error) {
+func (d *Dialer) Dial(ctx context.Context, addr string) (transport.Conn, error) {
 	conn, err := d.backing.Dial(ctx, addr)
 	if err != nil {
 		return nil, err

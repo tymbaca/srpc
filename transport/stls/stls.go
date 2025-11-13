@@ -10,7 +10,7 @@ import (
 	"io"
 
 	"github.com/tymbaca/sbinary"
-	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/transport"
 	"golang.org/x/crypto/chacha20"
 )
 
@@ -29,7 +29,7 @@ type exchangeKeyMsg struct {
 	Nonce    []byte
 }
 
-func handshake(conn srpc.Conn, key *ecdh.PrivateKey, lead bool) (_ *Conn, err error) {
+func handshake(conn transport.Conn, key *ecdh.PrivateKey, lead bool) (_ *Conn, err error) {
 	var (
 		hisPublicKey *ecdh.PublicKey
 		nonce        []byte

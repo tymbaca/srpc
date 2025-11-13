@@ -63,6 +63,10 @@ type statusError struct {
 }
 
 func (e statusError) Error() string {
+	if e.e == nil {
+		return e.status.String()
+	}
+
 	return fmt.Sprintf("%s: %s", e.status.String(), e.e.Error())
 }
 

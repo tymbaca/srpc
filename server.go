@@ -9,12 +9,13 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/tymbaca/srpc/enc"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
-	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
+	"github.com/tymbaca/srpc/transport"
 )
 
 func NewServer(codec Codec, opts ...ServerOption) *Server {
@@ -34,13 +35,14 @@ func NewServer(codec Codec, opts ...ServerOption) *Server {
 }
 
 type Server struct {
-	enc            enc.Context
-	codec          Codec
-	logger         logger.Logger
-	streamResponse bool
+	enc              enc.Context
+	codec            Codec
+	logger           logger.Logger
+	streamResponse   bool
+	connErrorHandler func(error) error
 
 	services map[string]service
-	l        Listener
+	l        transport.Listener
 }
 
 type service struct {
@@ -80,29 +82,20 @@ func RegisterWithName[T any](s *Server, impl T, name string) {
 	s.services[name] = service
 }
 
-func closeOnCancel(ctx context.Context, c io.Closer) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(ctx)
-	go func() {
-		<-ctx.Done()
-		c.Close()
-	}()
-	return ctx, cancel
-}
-
 // Start starts server with provided listener. It blocks until server (listener) get closed.
 // In normal scenario, if [Server.Close] was called, Start will exit with nil.
-// See [Listener.Accept] for details.
-func (s *Server) Start(ctx context.Context, l Listener) error {
+// See [transport.Listener.Accept] for details.
+func (s *Server) Start(ctx context.Context, l transport.Listener) error {
 	s.l = l
-	ctx, cancel := closeOnCancel(ctx, s)
+	ctx, cancel := fx.CloseOnCancel(ctx, s)
 	defer cancel()
 
 	for {
 		conn, err := s.l.Accept()
-		if errors.Is(err, ErrListenerClosed) {
+		if errors.Is(err, transport.ErrListenerClosed) {
 			return nil
 		}
-		if errors.Is(err, ErrListenerBadClose) {
+		if errors.Is(err, transport.ErrListenerBadClose) {
 			return err
 		}
 		if err != nil {
@@ -111,13 +104,19 @@ func (s *Server) Start(ctx context.Context, l Listener) error {
 		}
 
 		go func() {
-			ctx, cancel := closeOnCancel(ctx, conn)
+			ctx, cancel := fx.CloseOnCancel(ctx, conn)
 			defer cancel()
 
 			err := s.handleConn(ctx, conn)
 			if err != nil {
-				s.logger.Error(err.Error())
-				return
+				if s.connErrorHandler != nil {
+					if err = s.connErrorHandler(err); err != nil {
+						s.logger.Error(err.Error())
+					}
+					return
+				} else {
+					s.logger.Error(err.Error())
+				}
 			}
 		}()
 	}
@@ -132,7 +131,7 @@ func (s *Server) Close() error {
 	return nil
 }
 
-func (s *Server) handleConn(ctx context.Context, conn Conn) (err error) {
+func (s *Server) handleConn(ctx context.Context, conn transport.Conn) (err error) {
 	req, err := enc.ReadRequest(s.enc, conn)
 	if err != nil {
 		return err
@@ -147,17 +146,17 @@ func (s *Server) handleConn(ctx context.Context, conn Conn) (err error) {
 func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Response) {
 	serviceName, methodName, ok := req.ServiceMethod.Split()
 	if !ok {
-		return respErrorf(status.InvalidServiceMethod, "")
+		return respErrorf(nil, status.InvalidServiceMethod, "")
 	}
 
 	service, ok := s.services[serviceName]
 	if !ok {
-		return respErrorf(status.ServiceNotFound, "")
+		return respErrorf(nil, status.ServiceNotFound, "")
 	}
 
 	method, ok := service.methods[methodName]
 	if !ok {
-		return respErrorf(status.MethodNotFound, "")
+		return respErrorf(nil, status.MethodNotFound, "")
 	}
 
 	return s.call(method, ctx, req)
@@ -166,48 +165,46 @@ func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Respo
 func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
 	ctx = metadata.ToContext(ctx, req.Metadata.Map())
 
-	fx.Assert(method.val.Type().NumIn() == 2)
-	fx.Assert(method.val.Type().In(0) == reflect.TypeFor[context.Context]())
+	var respMD metadata.Metadata
+	ctx = metadata.ResponseToContext(ctx, &respMD)
 
 	argVal := reflect.New(method.val.Type().In(1))
 	err := s.codec.Decode(req.Body, argVal.Interface())
 	if err != nil {
-		return respErrorf(status.InvalidArgument, "can't decode input values: %w", err)
+		return respErrorf(respMD, status.InvalidArgument, "can't decode input values: %w", err)
 	}
 
 	retVals := method.val.Call(toValues(ctx, argVal.Elem().Interface()))
-	// assert(len(retVals) == 2)
-	// assert(reflect.TypeOf(retVals[1]) == reflect.TypeFor[error]())
 
 	ret := retVals[0].Interface()
 	if !retVals[1].IsNil() {
 		err := retVals[1].Interface().(error)
 		if code, ok := status.FromError(err); ok {
 			// to prevent duplicate code description on client, e.g. "InvalidArgument: InvalidArgument: <errorText>"
-			errMsg := strings.TrimSuffix(err.Error(), code.String()+": ") // yes, i know
-			return respError(code, errMsg)
+			errMsg := strings.TrimSuffix(err.Error(), code.String()+": ") // (yes, i know)
+			return respError(respMD, code, errMsg)
 		}
-		return respErrorf(status.ErrorFromService, "error from service: %w", err)
+		return respErrorf(respMD, status.ErrorFromService, "error from service: %w", err)
 	}
 
 	if s.streamResponse {
-		return resp(status.OK, pipe.ToReader(func(w io.Writer) error {
-			return s.codec.Encode(w, ret)
-		}))
+		return resp(respMD, status.OK,
+			pipe.ToReader(func(w io.Writer) error { return s.codec.Encode(w, ret) }),
+		)
 	}
 
 	bodyBuf := bytes.NewBuffer(nil)
 	bodyBuf.Grow(int(retVals[0].Type().Size())) // this is not an exact size, but it can be a good hint
 	if err := s.codec.Encode(bodyBuf, ret); err != nil {
-		return respErrorf(status.InternalError, "can't encode return values: %w", err)
+		return respErrorf(respMD, status.InternalError, "can't encode return values: %w", err)
 	}
 
-	return resp(status.OK, bodyBuf)
+	return resp(respMD, status.OK, bodyBuf)
 }
 
-func resp(statusCode status.Code, body io.Reader) enc.Response {
+func resp(md metadata.Metadata, statusCode status.Code, body io.Reader) enc.Response {
 	resp := enc.Response{
-		Metadata:   enc.Metadata{},
+		Metadata:   enc.NewMetadata(md),
 		StatusCode: statusCode,
 		Error:      nil,
 		Body:       body,
@@ -216,9 +213,9 @@ func resp(statusCode status.Code, body io.Reader) enc.Response {
 	return resp
 }
 
-func respError(statusCode status.Code, errorMsg string) enc.Response {
+func respError(md metadata.Metadata, statusCode status.Code, errorMsg string) enc.Response {
 	resp := enc.Response{
-		Metadata:   enc.Metadata{},
+		Metadata:   enc.NewMetadata(md),
 		StatusCode: statusCode,
 		Error:      errors.New(errorMsg),
 		Body:       nil,
@@ -227,9 +224,9 @@ func respError(statusCode status.Code, errorMsg string) enc.Response {
 	return resp
 }
 
-func respErrorf(statusCode status.Code, errorMsg string, errorMsgArgs ...any) enc.Response {
+func respErrorf(md metadata.Metadata, statusCode status.Code, errorMsg string, errorMsgArgs ...any) enc.Response {
 	resp := enc.Response{
-		Metadata:   enc.Metadata{},
+		Metadata:   enc.NewMetadata(md),
 		StatusCode: statusCode,
 		Error:      fmt.Errorf(errorMsg, errorMsgArgs...),
 		Body:       nil,

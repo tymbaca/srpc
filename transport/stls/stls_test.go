@@ -6,14 +6,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tymbaca/srpc"
+	transport "github.com/tymbaca/srpc/transport"
 	"github.com/tymbaca/srpc/transport/inmem"
 	"github.com/tymbaca/srpc/transport/testutil"
 	"golang.org/x/crypto/chacha20"
 )
 
-func newListener(c *inmem.Cluster) func() srpc.Listener {
-	return func() srpc.Listener {
+func newListener(c *inmem.Cluster) func() transport.Listener {
+	return func() transport.Listener {
 		l, err := NewListenerRandomKey(c.NewPeer().Listen())
 		if err != nil {
 			panic(err)
@@ -22,8 +22,8 @@ func newListener(c *inmem.Cluster) func() srpc.Listener {
 	}
 }
 
-func newDialer(c *inmem.Cluster) func() srpc.Dialer {
-	return func() srpc.Dialer {
+func newDialer(c *inmem.Cluster) func() transport.Dialer {
+	return func() transport.Dialer {
 		d, err := NewDialerRandomKey(c.NewPeer())
 		if err != nil {
 			panic(err)
@@ -42,7 +42,7 @@ func TestSimple(t *testing.T) {
 
 func TestStress(t *testing.T) {
 	c := inmem.New()
-	testutil.TestStress(t,
+	testutil.TestComplex(t,
 		newListener(c),
 		newDialer(c),
 		100,
@@ -65,7 +65,7 @@ func TestInside(t *testing.T) {
 	clientPeer := cluster.NewPeer()
 	serverPeer := cluster.NewPeer()
 
-	interceptorDialer, interceptor := testutil.NewDialInterceptor(clientPeer)
+	interceptorDialer, interceptor := testutil.NewInterceptorDialer(clientPeer)
 
 	dialer, err := NewDialerRandomKey(interceptorDialer)
 	require.NoError(t, err)

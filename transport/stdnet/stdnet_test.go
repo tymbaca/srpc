@@ -3,7 +3,7 @@ package stdnet
 import (
 	"testing"
 
-	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/transport"
 	"github.com/tymbaca/srpc/transport/testutil"
 )
 
@@ -19,10 +19,10 @@ func TestSimple(t *testing.T) {
 
 func TestStress(t *testing.T) {
 	t.Run("tcp", func(t *testing.T) {
-		testutil.TestStress(t, newListenerFunc("tcp", addr), newDialerFunc("tcp"), 100, 100)
+		testutil.TestComplex(t, newListenerFunc("tcp", addr), newDialerFunc("tcp"), 100, 100)
 	})
 	t.Run("unix", func(t *testing.T) {
-		testutil.TestStress(t, newListenerFunc("unix", unixAddr), newDialerFunc("unix"), 100, 100)
+		testutil.TestComplex(t, newListenerFunc("unix", unixAddr), newDialerFunc("unix"), 100, 100)
 	})
 }
 
@@ -31,8 +31,8 @@ func BenchmarkStress(b *testing.B) {
 	b.Run("unix", func(b *testing.B) { testutil.Benchmark(b, newListenerFunc("unix", unixAddr), newDialerFunc("unix")) })
 }
 
-func newListenerFunc(network string, addr string) func() srpc.Listener {
-	return func() srpc.Listener {
+func newListenerFunc(network string, addr string) func() transport.Listener {
+	return func() transport.Listener {
 		l, err := Listen(network, addr)
 		if err != nil {
 			panic(err)
@@ -41,8 +41,8 @@ func newListenerFunc(network string, addr string) func() srpc.Listener {
 	}
 }
 
-func newDialerFunc(network string) func() srpc.Dialer {
-	return func() srpc.Dialer {
+func newDialerFunc(network string) func() transport.Dialer {
+	return func() transport.Dialer {
 		return NewDialer(network)
 	}
 }

@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/tymbaca/srpc/call"
+	"github.com/tymbaca/srpc/enc"
+	"github.com/tymbaca/srpc/internal/callsuite"
 	"github.com/tymbaca/srpc/metadata"
-	"github.com/tymbaca/srpc/pkg/enc"
+	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
+	"github.com/tymbaca/srpc/transport"
 )
 
 var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
 
-func NewClient(addr string, codec Codec, connector Dialer) *Client {
+func NewClient(addr string, codec Codec, connector transport.Dialer) *Client {
 	return &Client{
 		addr:      addr,
 		enc:       enc.Context{Version: encVersion, IgnoreVersion: false},
@@ -26,7 +30,7 @@ type Client struct {
 	addr      string
 	enc       enc.Context
 	codec     Codec
-	connector Dialer
+	connector transport.Dialer
 }
 
 func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {
@@ -34,7 +38,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	if err != nil {
 		return fmt.Errorf("connect %s: %w", c.addr, err)
 	}
-	_, cancel := closeOnCancel(ctx, conn)
+	_, cancel := fx.CloseOnCancel(ctx, conn)
 	defer cancel()
 
 	md, _ := metadata.FromContext(ctx)
@@ -46,7 +50,17 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 		}),
 	}
 
-	err = enc.WriteRequest(c.enc, conn, encReq)
+	callSuite := callsuite.Suite{
+		Req:          encReq,
+		Conn:         conn,
+		RespMetadata: nil,
+	}
+
+	for _, opt := range call.OptionsFromContext(ctx) {
+		opt(&callSuite)
+	}
+
+	err = enc.WriteRequest(c.enc, callSuite.Conn, callSuite.Req)
 	if err != nil {
 		return err
 	}
@@ -56,15 +70,20 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 		return err
 	}
 
+	if callSuite.RespMetadata != nil {
+		*callSuite.RespMetadata = connResp.Metadata.Map()
+	}
+
 	if connResp.StatusCode != status.OK {
 		errMsg := connResp.Error.Error()
 		if errMsg == "" {
-			errMsg = "(no error descroption)"
+			return status.ErrorOnlyCode(connResp.StatusCode)
 		}
-		return status.Error(connResp.StatusCode, errMsg) // no wrapping, because connResp.Error always holds raw string error
+		return status.Error(connResp.StatusCode, errMsg)
 	}
 
 	err = c.codec.Decode(connResp.Body, resp)
+	drain(connResp.Body)
 	if err != nil {
 		return status.Errorf(status.InternalError, "decode response body: %w", err)
 	}

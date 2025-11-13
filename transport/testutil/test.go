@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	cryptoRand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -10,25 +11,33 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/call"
 	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
 	"github.com/tymbaca/srpc/status"
+	"github.com/tymbaca/srpc/transport"
 	"go.uber.org/goleak"
 )
 
-func goleakVerify(t *testing.T) {
-	goleak.VerifyNone(t, goleak.IgnoreCurrent(), goleak.IgnoreTopFunction("github.com/tymbaca/srpc/transport/testutil.(*TestServiceServer).LongAdd"))
+func goleakOpts() []goleak.Option {
+	return []goleak.Option{
+		goleak.IgnoreCurrent(),
+		goleak.IgnoreAnyFunction("github.com/tymbaca/srpc/transport/testutil.(*TestServiceServer).LongAdd"),
+	}
 }
 
-func TestSimple(t *testing.T, newListener func() srpc.Listener, newDialer func() srpc.Dialer) {
-	defer goleakVerify(t)
+func TestSimple(t *testing.T, newListener func() transport.Listener, newDialer func() transport.Dialer) {
+	defer goleak.VerifyNone(t, goleakOpts()...)
 	ctx := t.Context()
 
 	dialer := newDialer()
 	listener := newListener()
 
-	server := NewTestServiceServer(srpc.NewServer(codec.JSON))
+	server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithConnErrorHandler(func(err error) error {
+		// panic(err)
+		return nil // TODO: undo
+	})))
 	defer server.Close()
 	go server.Start(ctx, listener)
 
@@ -46,11 +55,49 @@ func TestSimple(t *testing.T, newListener func() srpc.Listener, newDialer func()
 	{
 		_, err := client.Divide(ctx, DivideReq{A: 10, B: 0})
 		require.Error(t, err)
+		code, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, status.InvalidArgument, code)
+	}
+	{
+		_, err := client.Divide(ctx, DivideReq{A: 10, B: -1})
+		require.Error(t, err)
+		code, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, status.ErrorFromService, code)
+	}
+	{
+		ctx := metadata.ToContext(ctx, metadata.Metadata{
+			"k1": {"v1", "v2"},
+		})
+
+		resp, err := client.ReplyMD(ctx, ReplyMDReq{Key: "k1"})
+		require.NoError(t, err)
+		require.Equal(t, ReplyMDResp{Vals: []string{"v1", "v2"}, Ok: true}, resp)
+
+		var respMD metadata.Metadata
+		ctx = call.WithOptions(ctx, call.WithResponseMetadata(&respMD))
+		resp, err = client.ReplyMD(ctx, ReplyMDReq{Key: "k1", RespMDKey: "rk1", RespMDVals: []string{"rv1", "rv2"}})
+		require.NoError(t, err)
+		require.Equal(t, ReplyMDResp{Vals: []string{"v1", "v2"}, Ok: true}, resp)
+		require.Equal(t, metadata.Metadata(map[string][]string{"rk1": {"rv1", "rv2"}}), respMD)
+
+		resp, err = client.ReplyMD(ctx, ReplyMDReq{Key: "badkey"})
+		require.NoError(t, err)
+		require.Equal(t, ReplyMDResp{Ok: false}, resp)
+	}
+	{
+		input := make([]byte, 1024*1024)
+		cryptoRand.Read(input)
+
+		resp, err := client.Blob(ctx, Blob{Data: input})
+		require.NoError(t, err)
+		require.Equal(t, input, resp.Data)
 	}
 }
 
-func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func() srpc.Dialer, clientCount, callPerClient int) {
-	defer goleakVerify(t)
+func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer func() transport.Dialer, clientCount, callPerClient int) {
+	defer goleak.VerifyNone(t, goleakOpts()...)
 	ctx := t.Context()
 
 	t.Run("single client", func(t *testing.T) {
@@ -65,50 +112,31 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 		require.Equal(t, 25, resp.Result)
 	})
 
-	t.Run("single client, different methods", func(t *testing.T) {
+	t.Run("close conn after successful dial (no goroutines must be left)", func(t *testing.T) {
 		listener := newListener()
 		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
-		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, newDialer()))
-		{
-			resp, err := client.Add(ctx, AddReq{A: 10, B: 15})
-			require.NoError(t, err)
-			require.Equal(t, 25, resp.Result)
-		}
-		{
-			resp, err := client.Divide(ctx, DivideReq{A: 10, B: 2})
-			require.NoError(t, err)
-			require.Equal(t, 5, resp.Result)
-		}
-		{
-			_, err := client.Divide(ctx, DivideReq{A: 10, B: 0})
-			require.Error(t, err)
-			code, ok := status.FromError(err)
-			require.True(t, ok)
-			require.Equal(t, status.InvalidArgument, code)
-		}
-		{
-			_, err := client.Divide(ctx, DivideReq{A: 10, B: -1})
-			require.Error(t, err)
-			code, ok := status.FromError(err)
-			require.True(t, ok)
-			require.Equal(t, status.ErrorFromService, code)
-		}
-		{
-			ctx := metadata.ToContext(ctx, metadata.Metadata{
-				"k1": {"v1", "v2"},
-			})
+		//
+		d, cancel := newInterruptDialer(ctx, newDialer(), &interruptConfig{CloseAfterDial: true})
+		defer cancel()
 
-			resp, err := client.ReplyMD(ctx, ReplyMDReq{Key: "k1"})
-			require.NoError(t, err)
-			require.Equal(t, ReplyMDResp{Vals: []string{"v1", "v2"}, Ok: true}, resp)
+		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, d))
 
-			resp, err = client.ReplyMD(ctx, ReplyMDReq{Key: "badkey"})
-			require.NoError(t, err)
-			require.Equal(t, ReplyMDResp{Ok: false}, resp)
-		}
+		// NOTE: we need big input to exceed the [chunked.BufferedWriter] buffer,
+		// because if we use smaller input, then we won't catch leaking
+		// goroutine from [pipe.ToReader] (it would fully write data
+		// into the reading side buffer and exit).
+		// See commit afc7710ae76fe85bfb83296884f345c89857e9e2 for details.
+		input := make([]byte, 1024*1024)
+		cryptoRand.Read(input)
+		_, err := client.Blob(ctx, Blob{Data: input})
+		require.Error(t, err)
+	})
+
+	t.Run("single client, different methods", func(t *testing.T) {
+		TestSimple(t, newListener, newDialer)
 	})
 
 	ctxCancelErrMsg := func(wait, waitCheck, dur time.Duration) string {
@@ -154,6 +182,13 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 			require.Error(t, err)
 			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
 		})
+		t.Run("already closed", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(ctx)
+			cancel()
+
+			_, err := client.LongAdd(ctx, AddReq{A: 10, B: 15})
+			require.Error(t, err)
+		})
 	})
 
 	t.Run("server, context check", func(t *testing.T) {
@@ -189,6 +224,13 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 			dur := time.Since(start)
 			require.NoError(t, err)
 			require.Less(t, dur, waitCheck, ctxCancelErrMsg(wait, waitCheck, dur))
+		})
+		t.Run("already canceled", func(t *testing.T) {
+			ctx, cancel := context.WithCancel(ctx)
+			cancel()
+
+			err := server.Start(ctx, newListener())
+			require.NoError(t, err)
 		})
 	})
 
@@ -240,7 +282,7 @@ func TestStress(t *testing.T, newListener func() srpc.Listener, newDialer func()
 	})
 }
 
-func Benchmark(b *testing.B, newListener func() srpc.Listener, newDialer func() srpc.Dialer) {
+func Benchmark(b *testing.B, newListener func() transport.Listener, newDialer func() transport.Dialer) {
 	ctx := b.Context()
 	dialer := newDialer()
 	listener := newListener()

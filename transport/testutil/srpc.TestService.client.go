@@ -21,13 +21,18 @@ func (c *TestServiceClient) Add(ctx context.Context, req AddReq) (resp AddResp, 
 	return resp, err
 }
 
-func (c *TestServiceClient) LongAdd(ctx context.Context, req AddReq) (resp AddResp, err error) {
-	err = c.Client.Call(ctx, "TestService.LongAdd", req, &resp)
+func (c *TestServiceClient) Blob(ctx context.Context, req Blob) (resp Blob, err error) {
+	err = c.Client.Call(ctx, "TestService.Blob", req, &resp)
 	return resp, err
 }
 
 func (c *TestServiceClient) Divide(ctx context.Context, req DivideReq) (resp DivideResp, err error) {
 	err = c.Client.Call(ctx, "TestService.Divide", req, &resp)
+	return resp, err
+}
+
+func (c *TestServiceClient) LongAdd(ctx context.Context, req AddReq) (resp AddResp, err error) {
+	err = c.Client.Call(ctx, "TestService.LongAdd", req, &resp)
 	return resp, err
 }
 

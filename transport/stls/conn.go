@@ -3,16 +3,16 @@ package stls
 import (
 	"crypto/cipher"
 
-	"github.com/tymbaca/srpc"
+	transport "github.com/tymbaca/srpc/transport"
 )
 
 type Conn struct {
 	r       cipher.StreamReader
 	w       cipher.StreamWriter
-	backing srpc.Conn
+	backing transport.Conn
 }
 
-func connWithCipher(conn srpc.Conn, stream cipher.Stream) *Conn {
+func connWithCipher(conn transport.Conn, stream cipher.Stream) *Conn {
 	return &Conn{
 		r:       cipher.StreamReader{S: stream, R: conn},
 		w:       cipher.StreamWriter{S: stream, W: conn},

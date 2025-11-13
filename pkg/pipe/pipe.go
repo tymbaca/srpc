@@ -1,10 +1,14 @@
+// Package pipe provides streaming IO utility.
 package pipe
 
 import (
 	"io"
 )
 
-func ToReader(fn func(w io.Writer) error) io.Reader {
+// ToReader launches provided writing function in the goroutine and returnes
+// reading side of the pipe. Returned r must be closed when it no longer needed
+// to prevent leaking goroutine in case if writing function still in progress.
+func ToReader(fn func(w io.Writer) error) (r io.ReadCloser) {
 	r, w := io.Pipe()
 
 	go func() {

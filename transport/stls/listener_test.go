@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/transport"
 	"github.com/tymbaca/srpc/transport/stls"
 )
 
@@ -14,7 +14,7 @@ func TestNewListener(t *testing.T) {
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
-		backing srpc.Listener
+		backing transport.Listener
 		key     *ecdh.PrivateKey
 		wantErr bool
 	}{
