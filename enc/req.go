@@ -9,6 +9,7 @@ import (
 
 	"github.com/tymbaca/sbinary"
 	"github.com/tymbaca/srpc/pkg/chunked"
+	"github.com/tymbaca/srpc/pkg/fx"
 )
 
 type Request struct {
@@ -43,7 +44,7 @@ func WriteRequest(c Context, w io.Writer, req Request) (err error) {
 	req.Version = c.Version
 	cw := chunked.NewBufferWriter(w)
 	defer func() { err = errors.Join(err, cw.Close()) }()
-	// defer fx.CloseIfCloser(req.Body) // if body is pipe.ToReader we need to kill it's goroutine, in case if error happens and we exit before EOF
+	defer fx.CloseIfCloser(req.Body) // if body is pipe.ToReader we need to kill it's goroutine, in case if error happens and we exit before EOF
 
 	if err := writeVersion(cw, req.Version); err != nil {
 		return err

@@ -9,6 +9,7 @@ import (
 
 	"github.com/tymbaca/sbinary"
 	"github.com/tymbaca/srpc/pkg/chunked"
+	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/status"
 )
 
@@ -54,7 +55,7 @@ func WriteResponse(c Context, w io.Writer, resp Response) (err error) {
 	resp.Version = c.Version
 	cw := chunked.NewBufferWriter(w)
 	defer func() { err = errors.Join(err, cw.Close()) }()
-	// defer fx.CloseIfCloser(resp.Body) // if body is pipe.ToReader we need to kill it's goroutine, in case if error happens and we exit before EOF
+	defer fx.CloseIfCloser(resp.Body) // if body is pipe.ToReader we need to kill it's goroutine, in case if error happens and we exit before EOF
 
 	if err := writeVersion(cw, resp.Version); err != nil {
 		return err

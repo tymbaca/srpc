@@ -30,10 +30,15 @@ type (
 	}
 )
 
-//go:generate srpc-gen --target=TestService
+type Blob struct {
+	Data []byte
+}
+
+//go:generate srpc-gen --target=TestService --only client
 type TestService interface {
 	Add(ctx context.Context, req AddReq) (AddResp, error)
 	LongAdd(ctx context.Context, req AddReq) (AddResp, error)
 	Divide(ctx context.Context, req DivideReq) (DivideResp, error)
 	ReplyMD(ctx context.Context, req ReplyMDReq) (ReplyMDResp, error)
+	Blob(ctx context.Context, req Blob) (Blob, error)
 }

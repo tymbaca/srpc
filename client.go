@@ -49,7 +49,6 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 			return c.codec.Encode(w, req)
 		}),
 	}
-	// defer fx.CloseIfCloser(encReq.Body)
 
 	callSuite := callsuite.Suite{
 		Req:          encReq,

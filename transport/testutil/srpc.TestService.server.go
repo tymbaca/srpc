@@ -55,3 +55,7 @@ func (s *TestServiceServer) ReplyMD(ctx context.Context, req ReplyMDReq) (ReplyM
 	val, ok := md[req.Key]
 	return ReplyMDResp{Vals: val, Ok: ok}, nil
 }
+
+func (s *TestServiceServer) Blob(ctx context.Context, req Blob) (Blob, error) {
+	return req, nil
+}
