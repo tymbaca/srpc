@@ -34,7 +34,9 @@ func TestSimple(t *testing.T, newListener func() transport.Listener, newDialer f
 	dialer := newDialer()
 	listener := newListener()
 
-	server := NewTestServiceServer(srpc.NewServer(codec.JSON))
+	server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithConnErrorHandler(func(err error) error {
+		panic(err)
+	})))
 	defer server.Close()
 	go server.Start(ctx, listener)
 

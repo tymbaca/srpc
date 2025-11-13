@@ -35,10 +35,11 @@ func NewServer(codec Codec, opts ...ServerOption) *Server {
 }
 
 type Server struct {
-	enc            enc.Context
-	codec          Codec
-	logger         logger.Logger
-	streamResponse bool
+	enc              enc.Context
+	codec            Codec
+	logger           logger.Logger
+	streamResponse   bool
+	connErrorHandler func(error) error
 
 	services map[string]service
 	l        transport.Listener
@@ -108,9 +109,14 @@ func (s *Server) Start(ctx context.Context, l transport.Listener) error {
 
 			err := s.handleConn(ctx, conn)
 			if err != nil {
-				panic(err) // TODO: remove
-				s.logger.Error(err.Error())
-				return
+				if s.connErrorHandler != nil {
+					if err = s.connErrorHandler(err); err != nil {
+						s.logger.Error(err.Error())
+					}
+					return
+				} else {
+					s.logger.Error(err.Error())
+				}
 			}
 		}()
 	}

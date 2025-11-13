@@ -10,6 +10,16 @@ func WithLogger(logger logger.Logger) ServerOption {
 	}
 }
 
+// WithConnErrorHandler sets handler for errors happening when handling
+// connections. If handler itself returns an error (even if it's the original error)
+// server will log it, using it's logger. If handler returns nil, server won't
+// original error.
+func WithConnErrorHandler(handler func(error) error) ServerOption {
+	return func(s *Server) {
+		s.connErrorHandler = handler
+	}
+}
+
 // WithStreamResponse controls response body writing process. Default: false.
 //
 // If val is false, then service return values will be fully encoded into bytes buffer before
