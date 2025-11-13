@@ -83,6 +83,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	}
 
 	err = c.codec.Decode(connResp.Body, resp)
+	drain(connResp.Body)
 	if err != nil {
 		return status.Errorf(status.InternalError, "decode response body: %w", err)
 	}
