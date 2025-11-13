@@ -12,12 +12,15 @@ import (
 	"go.uber.org/goleak"
 )
 
-func goleakVerify(t *testing.T) {
-	goleak.VerifyNone(t, goleak.IgnoreCurrent(), goleak.IgnoreTopFunction("github.com/tymbaca/srpc/transport/testutil.(*TestServiceServer).LongAdd"))
+func goleakOpts() []goleak.Option {
+	return []goleak.Option{
+		goleak.IgnoreCurrent(),
+		goleak.IgnoreTopFunction("github.com/tymbaca/srpc/transport/testutil.(*TestServiceServer).LongAdd"),
+	}
 }
 
 func TestSimple(t *testing.T, newListener func() transport.Listener, newDialer func() transport.Dialer) {
-	// defer goleakVerify(t)
+	// defer goleak.VerifyNone(t, goleakOpts()...)
 	// ctx := t.Context()
 	//
 	// dialer := newDialer()
@@ -45,7 +48,7 @@ func TestSimple(t *testing.T, newListener func() transport.Listener, newDialer f
 }
 
 func TestStress(t *testing.T, newListener func() transport.Listener, newDialer func() transport.Dialer, clientCount, callPerClient int) {
-	defer goleakVerify(t)
+	defer goleak.VerifyNone(t, goleakOpts()...)
 	ctx := t.Context()
 
 	// t.Run("single client", func(t *testing.T) {

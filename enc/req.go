@@ -3,6 +3,7 @@ package enc
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 
@@ -38,11 +39,10 @@ func ReadRequest(c Context, r io.Reader) (Request, error) {
 // WriteRequest writes request into w.
 // Currently req.Body must be [*bytes.Buffer] when writing.
 // In future, chunked io will be needed for dynamically filled readers.
-func WriteRequest(c Context, w io.Writer, req Request) error {
+func WriteRequest(c Context, w io.Writer, req Request) (err error) {
 	req.Version = c.Version
-	cw := chunked.NewWriter(w)
-	defer cw.Close() // FIX: handle error
-	// TODO: uncomment?
+	cw := chunked.NewBufferWriter(w)
+	defer func() { err = errors.Join(err, cw.Close()) }()
 	// defer fx.CloseIfCloser(req.Body) // if body is pipe.ToReader we need to kill it's goroutine, in case if error happens and we exit before EOF
 
 	if err := writeVersion(cw, req.Version); err != nil {
