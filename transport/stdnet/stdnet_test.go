@@ -19,10 +19,10 @@ func TestSimple(t *testing.T) {
 
 func TestStress(t *testing.T) {
 	t.Run("tcp", func(t *testing.T) {
-		testutil.TestStress(t, newListenerFunc("tcp", addr), newDialerFunc("tcp"), 100, 100)
+		testutil.TestComplex(t, newListenerFunc("tcp", addr), newDialerFunc("tcp"), 100, 100)
 	})
 	t.Run("unix", func(t *testing.T) {
-		testutil.TestStress(t, newListenerFunc("unix", unixAddr), newDialerFunc("unix"), 100, 100)
+		testutil.TestComplex(t, newListenerFunc("unix", unixAddr), newDialerFunc("unix"), 100, 100)
 	})
 }
 

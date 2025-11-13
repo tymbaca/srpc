@@ -42,7 +42,7 @@ func TestSimple(t *testing.T) {
 
 func TestStress(t *testing.T) {
 	c := inmem.New()
-	testutil.TestStress(t,
+	testutil.TestComplex(t,
 		newListener(c),
 		newDialer(c),
 		100,

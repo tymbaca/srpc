@@ -17,7 +17,7 @@ func TestSimple(t *testing.T) {
 
 func TestStress(t *testing.T) {
 	cluster := New()
-	testutil.TestStress(t,
+	testutil.TestComplex(t,
 		func() transport.Listener { return cluster.NewPeer().Listen() },
 		func() transport.Dialer { return cluster.NewPeer() },
 		100,

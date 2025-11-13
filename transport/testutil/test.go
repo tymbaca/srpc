@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/call"
 	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
@@ -51,6 +52,36 @@ func TestSimple(t *testing.T, newListener func() transport.Listener, newDialer f
 	{
 		_, err := client.Divide(ctx, DivideReq{A: 10, B: 0})
 		require.Error(t, err)
+		code, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, status.InvalidArgument, code)
+	}
+	{
+		_, err := client.Divide(ctx, DivideReq{A: 10, B: -1})
+		require.Error(t, err)
+		code, ok := status.FromError(err)
+		require.True(t, ok)
+		require.Equal(t, status.ErrorFromService, code)
+	}
+	{
+		ctx := metadata.ToContext(ctx, metadata.Metadata{
+			"k1": {"v1", "v2"},
+		})
+
+		resp, err := client.ReplyMD(ctx, ReplyMDReq{Key: "k1"})
+		require.NoError(t, err)
+		require.Equal(t, ReplyMDResp{Vals: []string{"v1", "v2"}, Ok: true}, resp)
+
+		var respMD metadata.Metadata
+		ctx = call.WithOptions(ctx, call.WithResponseMetadata(&respMD))
+		resp, err = client.ReplyMD(ctx, ReplyMDReq{Key: "k1", RespMDKey: "rk1", RespMDVals: []string{"rv1", "rv2"}})
+		require.NoError(t, err)
+		require.Equal(t, ReplyMDResp{Vals: []string{"v1", "v2"}, Ok: true}, resp)
+		require.Equal(t, metadata.Metadata(map[string][]string{"rk1": {"rv1", "rv2"}}), respMD)
+
+		resp, err = client.ReplyMD(ctx, ReplyMDReq{Key: "badkey"})
+		require.NoError(t, err)
+		require.Equal(t, ReplyMDResp{Ok: false}, resp)
 	}
 	{
 		input := make([]byte, 1024*1024)
@@ -62,7 +93,7 @@ func TestSimple(t *testing.T, newListener func() transport.Listener, newDialer f
 	}
 }
 
-func TestStress(t *testing.T, newListener func() transport.Listener, newDialer func() transport.Dialer, clientCount, callPerClient int) {
+func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer func() transport.Dialer, clientCount, callPerClient int) {
 	defer goleak.VerifyNone(t, goleakOpts()...)
 	ctx := t.Context()
 
@@ -102,49 +133,7 @@ func TestStress(t *testing.T, newListener func() transport.Listener, newDialer f
 	})
 
 	t.Run("single client, different methods", func(t *testing.T) {
-		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
-		defer server.Close()
-		go server.Start(ctx, listener)
-
-		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, newDialer()))
-		{
-			resp, err := client.Add(ctx, AddReq{A: 10, B: 15})
-			require.NoError(t, err)
-			require.Equal(t, 25, resp.Result)
-		}
-		{
-			resp, err := client.Divide(ctx, DivideReq{A: 10, B: 2})
-			require.NoError(t, err)
-			require.Equal(t, 5, resp.Result)
-		}
-		{
-			_, err := client.Divide(ctx, DivideReq{A: 10, B: 0})
-			require.Error(t, err)
-			code, ok := status.FromError(err)
-			require.True(t, ok)
-			require.Equal(t, status.InvalidArgument, code)
-		}
-		{
-			_, err := client.Divide(ctx, DivideReq{A: 10, B: -1})
-			require.Error(t, err)
-			code, ok := status.FromError(err)
-			require.True(t, ok)
-			require.Equal(t, status.ErrorFromService, code)
-		}
-		{
-			ctx := metadata.ToContext(ctx, metadata.Metadata{
-				"k1": {"v1", "v2"},
-			})
-
-			resp, err := client.ReplyMD(ctx, ReplyMDReq{Key: "k1"})
-			require.NoError(t, err)
-			require.Equal(t, ReplyMDResp{Vals: []string{"v1", "v2"}, Ok: true}, resp)
-
-			resp, err = client.ReplyMD(ctx, ReplyMDReq{Key: "badkey"})
-			require.NoError(t, err)
-			require.Equal(t, ReplyMDResp{Ok: false}, resp)
-		}
+		TestSimple(t, newListener, newDialer)
 	})
 
 	ctxCancelErrMsg := func(wait, waitCheck, dur time.Duration) string {

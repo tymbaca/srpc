@@ -22,7 +22,9 @@ type (
 
 type (
 	ReplyMDReq struct {
-		Key string
+		Key        string
+		RespMDKey  string
+		RespMDVals []string
 	}
 	ReplyMDResp struct {
 		Vals []string

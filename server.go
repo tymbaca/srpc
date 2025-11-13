@@ -108,6 +108,7 @@ func (s *Server) Start(ctx context.Context, l transport.Listener) error {
 
 			err := s.handleConn(ctx, conn)
 			if err != nil {
+				panic(err) // TODO: remove
 				s.logger.Error(err.Error())
 				return
 			}
