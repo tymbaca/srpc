@@ -55,7 +55,7 @@ func WriteResponse(c Context, w io.Writer, resp Response) error {
 	resp.Version = c.Version
 	cw := chunked.NewBufferWriter(w)
 	defer cw.Close()
-	defer fx.CloseIfCloser(resp.Body) // if body is pipe.ToReader we need to kill it's goroutine
+	defer fx.CloseIfCloser(resp.Body) // if body is pipe.ToReader we need to kill it's goroutine, in case if error happens and we exit before EOF
 
 	if err := writeVersion(cw, resp.Version); err != nil {
 		return err

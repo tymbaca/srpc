@@ -3,10 +3,11 @@ package call
 import (
 	"context"
 
+	"github.com/tymbaca/srpc/internal/callsuite"
 	"github.com/tymbaca/srpc/metadata"
 )
 
-type Option func(c *Suite)
+type Option func(c *callsuite.Suite)
 
 type callOptKey struct{}
 
@@ -20,7 +21,7 @@ func OptionsFromContext(ctx context.Context) []Option {
 }
 
 func WithResponseMetadata(md *metadata.Metadata) Option {
-	return func(c *Suite) {
+	return func(c *callsuite.Suite) {
 		c.RespMetadata = md
 	}
 }

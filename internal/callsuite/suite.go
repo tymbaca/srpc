@@ -1,8 +1,8 @@
-package call
+package callsuite
 
 import (
+	"github.com/tymbaca/srpc/enc"
 	"github.com/tymbaca/srpc/metadata"
-	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/transport"
 )
 

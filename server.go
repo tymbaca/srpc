@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/tymbaca/srpc/enc"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
-	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
@@ -158,9 +158,6 @@ func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Respo
 func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
 	ctx = metadata.ToContext(ctx, req.Metadata.Map())
 
-	fx.Assert(method.val.Type().NumIn() == 2)
-	fx.Assert(method.val.Type().In(0) == reflect.TypeFor[context.Context]())
-
 	argVal := reflect.New(method.val.Type().In(1))
 	err := s.codec.Decode(req.Body, argVal.Interface())
 	if err != nil {
@@ -168,24 +165,22 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 	}
 
 	retVals := method.val.Call(toValues(ctx, argVal.Elem().Interface()))
-	// assert(len(retVals) == 2)
-	// assert(reflect.TypeOf(retVals[1]) == reflect.TypeFor[error]())
 
 	ret := retVals[0].Interface()
 	if !retVals[1].IsNil() {
 		err := retVals[1].Interface().(error)
 		if code, ok := status.FromError(err); ok {
 			// to prevent duplicate code description on client, e.g. "InvalidArgument: InvalidArgument: <errorText>"
-			errMsg := strings.TrimSuffix(err.Error(), code.String()+": ") // yes, i know
+			errMsg := strings.TrimSuffix(err.Error(), code.String()+": ") // (yes, i know)
 			return respError(code, errMsg)
 		}
 		return respErrorf(status.ErrorFromService, "error from service: %w", err)
 	}
 
 	if s.streamResponse {
-		return resp(status.OK, pipe.ToReader(func(w io.Writer) error {
-			return s.codec.Encode(w, ret)
-		}))
+		return resp(status.OK,
+			pipe.ToReader(func(w io.Writer) error { return s.codec.Encode(w, ret) }),
+		)
 	}
 
 	bodyBuf := bytes.NewBuffer(nil)

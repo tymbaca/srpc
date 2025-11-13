@@ -66,6 +66,12 @@ func TestStress(t *testing.T, newListener func() transport.Listener, newDialer f
 		require.Equal(t, 25, resp.Result)
 	})
 
+	t.Run("no server", func(t *testing.T) {
+		client := NewTestServiceClient(srpc.NewClient("wrong-addr", codec.JSON, newDialer()))
+		_, err := client.Add(ctx, AddReq{A: 10, B: 15})
+		require.Error(t, err)
+	})
+
 	t.Run("single client, different methods", func(t *testing.T) {
 		listener := newListener()
 		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))

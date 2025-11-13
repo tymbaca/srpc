@@ -3,8 +3,6 @@ package metadata
 
 import (
 	"context"
-
-	_ "github.com/tymbaca/srpc/pkg/enc"
 )
 
 // Metadata is user side metadata representation. It can be placed into the
@@ -31,7 +29,7 @@ func FromContext(ctx context.Context) (Metadata, bool) {
 type respMetadataCtxKey struct{}
 
 // ResponseFromContext returns a pointer to metadata. It can be used in server-side service
-// implementation methods to fill response metadata. Client will receive it when using [srpc.WithResponseMetadata].
+// implementation methods to fill response metadata. Client will receive it when using [srpc.WithResponseMetadata] call option.
 func ResponseFromContext(ctx context.Context) *Metadata {
 	md, _ := ctx.Value(respMetadataCtxKey{}).(*Metadata)
 	return md

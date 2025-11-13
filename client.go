@@ -6,8 +6,9 @@ import (
 	"io"
 
 	"github.com/tymbaca/srpc/call"
+	"github.com/tymbaca/srpc/enc"
+	"github.com/tymbaca/srpc/internal/callsuite"
 	"github.com/tymbaca/srpc/metadata"
-	"github.com/tymbaca/srpc/pkg/enc"
 	"github.com/tymbaca/srpc/pkg/fx"
 	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
@@ -50,7 +51,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	}
 	defer fx.CloseIfCloser(encReq.Body)
 
-	callSuite := call.Suite{
+	callSuite := callsuite.Suite{
 		Req:          encReq,
 		Conn:         conn,
 		RespMetadata: nil,

@@ -35,11 +35,14 @@ func CloseOnCancel(ctx context.Context, c io.Closer) (context.Context, context.C
 		<-ctx.Done()
 		c.Close()
 	}()
+
 	return ctx, cancel
 }
 
-func CloseIfCloser(v any) {
+func CloseIfCloser(v any) error {
 	if c, ok := v.(io.Closer); ok {
-		c.Close()
+		return c.Close()
 	}
+
+	return nil
 }
