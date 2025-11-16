@@ -139,7 +139,7 @@ func (s *Server) handleConn(ctx context.Context, conn transport.Conn) (err error
 
 	resp := s.handleReq(ctx, req)
 
-	drain(req.Body)
+	_ = drain(req.Body)
 	return enc.WriteResponse(s.enc, conn, resp)
 }
 
@@ -280,6 +280,10 @@ func toValues(ins ...any) []reflect.Value {
 	return outs
 }
 
-func drain(r io.Reader) {
-	io.Copy(io.Discard, r)
+func drain(r io.Reader) error {
+	if r == nil {
+		return nil
+	}
+	_, err := io.Copy(io.Discard, r)
+	return err
 }

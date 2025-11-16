@@ -69,6 +69,7 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	if err != nil {
 		return err
 	}
+	defer drain(connResp.Body)
 
 	if callSuite.RespMetadata != nil {
 		*callSuite.RespMetadata = connResp.Metadata.Map()
@@ -83,7 +84,6 @@ func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp a
 	}
 
 	err = c.codec.Decode(connResp.Body, resp)
-	drain(connResp.Body)
 	if err != nil {
 		return status.Errorf(status.InternalError, "decode response body: %w", err)
 	}
