@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/tymbaca/srpc/call"
+	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/enc"
 	"github.com/tymbaca/srpc/internal/callsuite"
 	"github.com/tymbaca/srpc/metadata"
@@ -17,7 +18,7 @@ import (
 
 var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
 
-func NewClient(addr string, codec Codec, connector transport.Dialer) *Client {
+func NewClient(addr string, codec codec.Codec, connector transport.Dialer) *Client {
 	return &Client{
 		addr:      addr,
 		enc:       enc.Context{Version: encVersion, IgnoreVersion: false},
@@ -29,7 +30,7 @@ func NewClient(addr string, codec Codec, connector transport.Dialer) *Client {
 type Client struct {
 	addr      string
 	enc       enc.Context
-	codec     Codec
+	codec     codec.Codec
 	connector transport.Dialer
 }
 

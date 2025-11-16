@@ -1,12 +1,12 @@
-package codec
+package helper
 
 import (
 	"io"
 
-	"github.com/tymbaca/srpc"
+	"github.com/tymbaca/srpc/codec"
 )
 
-func ToDecoder[T commonDecoder](newFunc NewDecoderFunc[T]) srpc.Decoder {
+func ToDecoder[T commonDecoder](newFunc NewDecoderFunc[T]) codec.Decoder {
 	return &commonDecoderWrapper[T]{newFunc: newFunc}
 }
 

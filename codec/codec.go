@@ -1,17 +1,16 @@
 package codec
 
-import (
-	"github.com/tymbaca/srpc"
-)
+import "io"
 
-func ToCodec[E commonEncoder, D commonDecoder](
-	newEncFunc NewEncoderFunc[E],
-	newDecFunc NewDecoderFunc[D],
-) srpc.Codec {
-	return &commonCodecWrapper[E, D]{ToEncoder(newEncFunc), ToDecoder(newDecFunc)}
+type Codec interface {
+	Encoder
+	Decoder
 }
 
-type commonCodecWrapper[E commonEncoder, D commonDecoder] struct {
-	srpc.Encoder
-	srpc.Decoder
+type Decoder interface {
+	Decode(r io.Reader, dst any) error
+}
+
+type Encoder interface {
+	Encode(w io.Writer, src any) error
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/tymbaca/srpc"
-	"github.com/tymbaca/srpc/codec"
+	"github.com/tymbaca/srpc/codec/json"
 	"github.com/tymbaca/srpc/transport/inmem"
 )
 
@@ -22,7 +22,7 @@ func main() {
 }
 
 func runServer(ctx context.Context, peer *inmem.Peer) {
-	server := NewTestServiceServer(srpc.NewServer(codec.JSON))
+	server := NewTestServiceServer(srpc.NewServer(json.Codec))
 	defer server.Close()
 
 	err := server.Start(ctx, peer.Listen())
@@ -32,7 +32,7 @@ func runServer(ctx context.Context, peer *inmem.Peer) {
 }
 
 func runClient(ctx context.Context, peer *inmem.Peer, target string) {
-	client := NewTestServiceClient(srpc.NewClient(target, codec.JSON, peer))
+	client := NewTestServiceClient(srpc.NewClient(target, json.Codec, peer))
 
 	// insead of `client.Call(ctx, "TestService.Divide", req, &resp)`
 	resp, err := client.Divide(ctx, DivideReq{A: 10, B: 2})

@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/enc"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
@@ -18,7 +19,7 @@ import (
 	"github.com/tymbaca/srpc/transport"
 )
 
-func NewServer(codec Codec, opts ...ServerOption) *Server {
+func NewServer(codec codec.Codec, opts ...ServerOption) *Server {
 	s := &Server{
 		enc:            enc.Context{Version: encVersion, IgnoreVersion: false},
 		codec:          codec,
@@ -36,7 +37,7 @@ func NewServer(codec Codec, opts ...ServerOption) *Server {
 
 type Server struct {
 	enc              enc.Context
-	codec            Codec
+	codec            codec.Codec
 	logger           logger.Logger
 	streamResponse   bool
 	connErrorHandler func(error) error
