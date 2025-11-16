@@ -14,7 +14,7 @@ import (
 type TestService interface {
 	Add(ctx context.Context, req AddReq) (AddResp, error)
 	Divide(ctx context.Context, req DivideReq) (DivideResp, error)
-	// NOTE: input and output types can be from another packages
+	// NOTE: input and output types can be from other packages
 	Multiply(ctx context.Context, req inner.MultiplyReq) (inner.MultiplyResp, error)
 }
 
