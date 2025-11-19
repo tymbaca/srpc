@@ -18,6 +18,7 @@ import (
 
 var encVersion = enc.Version{Major: 0, Minor: 1, Patch: 0}
 
+// NewClient create a new [Client] with provided address, codec and connector.
 func NewClient(addr string, codec codec.Codec, connector transport.Dialer) *Client {
 	return &Client{
 		addr:      addr,
@@ -27,6 +28,7 @@ func NewClient(addr string, codec codec.Codec, connector transport.Dialer) *Clie
 	}
 }
 
+// Client is used to invoke RPC's on the server.
 type Client struct {
 	addr      string
 	enc       enc.Context
@@ -34,6 +36,9 @@ type Client struct {
 	connector transport.Dialer
 }
 
+// Call invokes the serviceMethod RPC on the server. Provided req and resp must
+// match the input and output type on the server, resp must be a valid pointer.
+// They will be encoded/decoded using the specified client codec.
 func (c *Client) Call(ctx context.Context, serviceMethod string, req any, resp any) error {
 	conn, err := c.connector.Dial(ctx, c.addr)
 	if err != nil {

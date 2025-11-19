@@ -102,7 +102,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("single client", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
@@ -114,7 +114,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("close conn after successful dial (no goroutines must be left)", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
@@ -145,7 +145,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("single client, context check", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
@@ -192,7 +192,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 	})
 
 	t.Run("server, context check", func(t *testing.T) {
-		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 
 		wait := 20 * time.Millisecond
@@ -236,7 +236,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("multiple clients parallel each multiple calls", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
@@ -259,7 +259,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("multiple clients parallel each multiple calls | close", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
@@ -287,7 +287,7 @@ func Benchmark(b *testing.B, newListener func() transport.Listener, newDialer fu
 	dialer := newDialer()
 	listener := newListener()
 
-	server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaulSLogger{})))
+	server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 	defer server.Close()
 	go server.Start(ctx, listener)
 

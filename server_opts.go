@@ -4,6 +4,7 @@ import "github.com/tymbaca/srpc/logger"
 
 type ServerOption func(s *Server)
 
+// WithLogger sets provided logger in the server.
 func WithLogger(logger logger.Logger) ServerOption {
 	return func(s *Server) {
 		s.logger = logger

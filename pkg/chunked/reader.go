@@ -5,12 +5,15 @@ import (
 	"io"
 )
 
+// NewReader creates a new [Reader]
 func NewReader(r io.Reader) *Reader {
 	buf := bytes.NewBuffer(nil)
 	buf.Grow(defaultBufSize)
 	return &Reader{r: r, buf: buf}
 }
 
+// Reader reads chunks from backing r. When got empty chunk it will return
+// [io.EOF] on the next Read call.
 type Reader struct {
 	r      io.Reader
 	buf    *bytes.Buffer

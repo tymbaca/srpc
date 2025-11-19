@@ -19,6 +19,7 @@ import (
 	"github.com/tymbaca/srpc/transport"
 )
 
+// NewServer creates new [Server] with provided codec and options.
 func NewServer(codec codec.Codec, opts ...ServerOption) *Server {
 	s := &Server{
 		enc:            enc.Context{Version: encVersion, IgnoreVersion: false},
@@ -35,6 +36,8 @@ func NewServer(codec codec.Codec, opts ...ServerOption) *Server {
 	return s
 }
 
+// Server is the RPC server. It holds registered services with methods
+// and calls them when it gets the request with matching ServiceName.
 type Server struct {
 	enc              enc.Context
 	codec            codec.Codec
@@ -58,11 +61,24 @@ type method struct {
 	val reflect.Value
 }
 
+// Register registers the provided service impl into the server.
+// It registers it with the name of provided T, e.g.:
+// - `Register(s, MyServiceImpl{})` will register it as "MyServiceImpl",
+// - `Register[MyService](s, MyServiceImpl{})` will register it as "MyService".
 func Register[T any](s *Server, impl T) {
-	RegisterWithName(s, impl, "")
+	registerWithName(s, impl, "")
 }
 
+// RegisterWithName registers the provided service impl into the server with provided name.
+// If name == "", nothing will happen.
 func RegisterWithName[T any](s *Server, impl T, name string) {
+	if name == "" {
+		return
+	}
+	registerWithName(s, impl, name)
+}
+
+func registerWithName[T any](s *Server, impl T, name string) {
 	t := reflect.TypeFor[T]()
 	v := reflect.ValueOf(impl)
 

@@ -1,7 +1,5 @@
 package enc
 
-// TODO: move to project root
-
 import (
 	"strings"
 
@@ -9,6 +7,7 @@ import (
 	"github.com/tymbaca/srpc/status"
 )
 
+// ServiceMethod represents service and method string
 type ServiceMethod = String // e.g. "Service.Method"
 
 func (sm ServiceMethod) Split() (service string, method string, ok bool) {
