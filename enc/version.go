@@ -9,10 +9,12 @@ import (
 	"github.com/tymbaca/sbinary"
 )
 
+// Version represents version of encoder.
 type Version struct {
 	Major, Minor, Patch uint16
 }
 
+// CompatibleWith ensures that both versions have the same major version.
 func (v Version) CompatibleWith(other Version) bool {
 	return v.Major == other.Major
 }
@@ -51,6 +53,7 @@ func writeVersion(w io.Writer, ver Version) error {
 	return nil
 }
 
+// ErrIncompatibleVersion returned during request/response read if host and remote peer versions are incompatible.
 var ErrIncompatibleVersion = errors.New("version is not compatible")
 
 func incompatibleVersionError(my Version, other Version) error {

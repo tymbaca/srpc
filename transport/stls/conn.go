@@ -6,36 +6,36 @@ import (
 	transport "github.com/tymbaca/srpc/transport"
 )
 
-type Conn struct {
+func connWithCipher(c transport.Conn, stream cipher.Stream) *conn {
+	return &conn{
+		r:       cipher.StreamReader{S: stream, R: c},
+		w:       cipher.StreamWriter{S: stream, W: c},
+		backing: c,
+	}
+}
+
+type conn struct {
 	r       cipher.StreamReader
 	w       cipher.StreamWriter
 	backing transport.Conn
 }
 
-func connWithCipher(conn transport.Conn, stream cipher.Stream) *Conn {
-	return &Conn{
-		r:       cipher.StreamReader{S: stream, R: conn},
-		w:       cipher.StreamWriter{S: stream, W: conn},
-		backing: conn,
-	}
-}
-
-func (c *Conn) Read(p []byte) (n int, err error) {
+func (c *conn) Read(p []byte) (n int, err error) {
 	return c.r.Read(p)
 }
 
-func (c *Conn) Write(p []byte) (n int, err error) {
+func (c *conn) Write(p []byte) (n int, err error) {
 	return c.w.Write(p)
 }
 
-func (c *Conn) RemoteAddr() string {
+func (c *conn) RemoteAddr() string {
 	return c.backing.RemoteAddr()
 }
 
-func (c *Conn) LocalAddr() string {
+func (c *conn) LocalAddr() string {
 	return c.backing.LocalAddr()
 }
 
-func (c *Conn) Close() error {
+func (c *conn) Close() error {
 	return c.backing.Close()
 }

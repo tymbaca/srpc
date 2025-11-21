@@ -2,6 +2,7 @@ package stls
 
 import (
 	"bytes"
+	"crypto/rand"
 	"io"
 	"testing"
 
@@ -14,7 +15,7 @@ import (
 
 func newListener(c *inmem.Cluster) func() transport.Listener {
 	return func() transport.Listener {
-		l, err := NewListenerRandomKey(c.NewPeer().Listen())
+		l, err := NewListenerRandomKey(c.NewPeer().Listen(), rand.Reader)
 		if err != nil {
 			panic(err)
 		}
@@ -70,7 +71,7 @@ func TestInside(t *testing.T) {
 	dialer, err := NewDialerRandomKey(interceptorDialer)
 	require.NoError(t, err)
 
-	listener, err := NewListenerRandomKey(serverPeer.Listen())
+	listener, err := NewListenerRandomKey(serverPeer.Listen(), rand.Reader)
 	require.NoError(t, err)
 
 	clientMsg := bytes.Repeat([]byte("c"), 100)

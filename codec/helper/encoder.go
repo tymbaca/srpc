@@ -6,6 +6,7 @@ import (
 	"github.com/tymbaca/srpc/codec"
 )
 
+// ToEncoder creates [codec.Encoder] from common encoder creation function, e.g. `json.NewEncoder`.
 func ToEncoder[T commonEncoder](newFunc NewEncoderFunc[T]) codec.Encoder {
 	return &commonEncoderWrapper[T]{newFunc: newFunc}
 }

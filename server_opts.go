@@ -2,6 +2,7 @@ package srpc
 
 import "github.com/tymbaca/srpc/logger"
 
+// ServerOption modifies the server when passed into [NewServer].
 type ServerOption func(s *Server)
 
 // WithLogger sets provided logger in the server.
@@ -21,7 +22,7 @@ func WithConnErrorHandler(handler func(error) error) ServerOption {
 	}
 }
 
-// WithStreamResponse controls response body writing process. Default: false.
+// WithStreamingResponse controls response body writing process. Default: false.
 //
 // If val is false, then service return values will be fully encoded into bytes buffer before
 // sending to the client.
@@ -33,7 +34,7 @@ func WithConnErrorHandler(handler func(error) error) ServerOption {
 // Note: with this option set to true client won't be able to get descriptive
 // error message if server gets error from [Codec.Decode], because that error
 // will be produced when sending process has already been started.
-func WithStreamResponse(val bool) ServerOption {
+func WithStreamingResponse(val bool) ServerOption {
 	return func(s *Server) {
 		s.streamResponse = val
 	}

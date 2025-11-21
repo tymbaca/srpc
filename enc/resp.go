@@ -8,8 +8,8 @@ import (
 	"io"
 
 	"github.com/tymbaca/sbinary"
-	"github.com/tymbaca/srpc/pkg/chunked"
-	"github.com/tymbaca/srpc/pkg/fx"
+	"github.com/tymbaca/srpc/internal/chunked"
+	"github.com/tymbaca/srpc/internal/fx"
 	"github.com/tymbaca/srpc/status"
 )
 

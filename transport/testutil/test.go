@@ -1,3 +1,4 @@
+// Package testutil provides common tests and utilities for transport implementations.
 package testutil
 
 import (

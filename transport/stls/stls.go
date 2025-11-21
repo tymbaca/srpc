@@ -1,4 +1,5 @@
-// Package stls provides sRPC transport layer with key exchange and symmetric encryption.
+// Package stls provides srpc transport layer with key exchange and symmetric encryption.
+// It wraps another backing transport implementation.
 package stls
 
 import (
@@ -17,7 +18,6 @@ import (
 var _curve = ecdh.P256()
 
 const (
-	_keyLen        = 32
 	_version uint8 = 1
 )
 
@@ -29,7 +29,7 @@ type exchangeKeyMsg struct {
 	Nonce    []byte
 }
 
-func handshake(conn transport.Conn, key *ecdh.PrivateKey, lead bool) (_ *Conn, err error) {
+func handshake(conn transport.Conn, key *ecdh.PrivateKey, lead bool) (_ *conn, err error) {
 	var (
 		hisPublicKey *ecdh.PublicKey
 		nonce        []byte

@@ -1,3 +1,4 @@
+// Package stdnet provides srpc transport implementation using standart library `net` package.
 package stdnet
 
 import (
@@ -32,7 +33,7 @@ func (l *Listener) Addr() string {
 // If Listener got closed Accept must return [ErrListenerClosed],
 // including Accept calls that didn't returned yet.
 func (l *Listener) Accept() (transport.Conn, error) {
-	conn, err := l.l.Accept()
+	c, err := l.l.Accept()
 	if errors.Is(err, net.ErrClosed) {
 		return nil, transport.ErrListenerClosed
 	}
@@ -40,7 +41,7 @@ func (l *Listener) Accept() (transport.Conn, error) {
 		return nil, err
 	}
 
-	return &Conn{c: conn}, nil
+	return &conn{c: c}, nil
 }
 
 // Close closes the listener.
@@ -55,7 +56,7 @@ func NewDialer(network string) *Dialer {
 	return &Dialer{network: network}
 }
 
-// Dialer implements [srpc.Dialer].
+// Dialer implements [transport.Dialer].
 type Dialer struct {
 	network string
 }
@@ -63,35 +64,34 @@ type Dialer struct {
 // Dial dials to addr using d.network.
 func (d *Dialer) Dial(ctx context.Context, addr string) (transport.Conn, error) {
 	var dd net.Dialer
-	conn, err := dd.DialContext(ctx, d.network, addr)
+	c, err := dd.DialContext(ctx, d.network, addr)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Conn{c: conn}, nil
+	return &conn{c: c}, nil
 }
 
-// Conn implements [transport.Conn]
-type Conn struct {
+type conn struct {
 	c net.Conn
 }
 
-func (c *Conn) RemoteAddr() string {
+func (c *conn) RemoteAddr() string {
 	return c.c.RemoteAddr().String()
 }
 
-func (c *Conn) LocalAddr() string {
+func (c *conn) LocalAddr() string {
 	return c.c.LocalAddr().String()
 }
 
-func (c *Conn) Read(p []byte) (n int, err error) {
+func (c *conn) Read(p []byte) (n int, err error) {
 	return c.c.Read(p)
 }
 
-func (c *Conn) Write(p []byte) (n int, err error) {
+func (c *conn) Write(p []byte) (n int, err error) {
 	return c.c.Write(p)
 }
 
-func (c *Conn) Close() error {
+func (c *conn) Close() error {
 	return c.c.Close()
 }

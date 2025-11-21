@@ -11,10 +11,10 @@ import (
 
 	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/enc"
+	"github.com/tymbaca/srpc/internal/fx"
+	"github.com/tymbaca/srpc/internal/pipe"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
-	"github.com/tymbaca/srpc/pkg/fx"
-	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
 	"github.com/tymbaca/srpc/transport"
 )
