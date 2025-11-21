@@ -30,9 +30,3 @@ func (s *EchoServiceServer) Echo(ctx context.Context, req string) (string, error
 
 	return "world", nil
 }
-
-func (s *EchoServiceServer) EchoStruct(ctx context.Context, req EchoStructReq) (EchoStructResp, error) {
-	fmt.Println("msg from client:", req)
-
-	return EchoStructResp{Val: "world"}, nil
-}

@@ -25,7 +25,7 @@ func newListener(c *inmem.Cluster) func() transport.Listener {
 
 func newDialer(c *inmem.Cluster) func() transport.Dialer {
 	return func() transport.Dialer {
-		d, err := NewDialerRandomKey(c.NewPeer())
+		d, err := NewDialerRandomKey(c.NewPeer(), rand.Reader)
 		if err != nil {
 			panic(err)
 		}
@@ -68,7 +68,7 @@ func TestInside(t *testing.T) {
 
 	interceptorDialer, interceptor := testutil.NewInterceptorDialer(clientPeer)
 
-	dialer, err := NewDialerRandomKey(interceptorDialer)
+	dialer, err := NewDialerRandomKey(interceptorDialer, rand.Reader)
 	require.NoError(t, err)
 
 	listener, err := NewListenerRandomKey(serverPeer.Listen(), rand.Reader)

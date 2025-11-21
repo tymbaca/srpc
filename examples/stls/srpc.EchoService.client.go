@@ -19,8 +19,3 @@ func (c *EchoServiceClient) Echo(ctx context.Context, req string) (resp string, 
 	err = c.Client.Call(ctx, "EchoService.Echo", req, &resp)
 	return resp, err
 }
-
-func (c *EchoServiceClient) EchoStruct(ctx context.Context, req EchoStructReq) (resp EchoStructResp, err error) {
-	err = c.Client.Call(ctx, "EchoService.EchoStruct", req, &resp)
-	return resp, err
-}

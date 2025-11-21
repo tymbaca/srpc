@@ -3,16 +3,17 @@ package stls
 import (
 	"context"
 	"crypto/ecdh"
-	"crypto/rand"
+	_ "crypto/rand"
 	"fmt"
+	"io"
 
 	transport "github.com/tymbaca/srpc/transport"
 )
 
 // NewDialerRandomKey is the same as [NewDialer] but it generates a key
 // using provided random reader (e.g. [rand.Reader]).
-func NewDialerRandomKey(backing transport.Dialer) (*Dialer, error) {
-	key, err := _curve.GenerateKey(rand.Reader)
+func NewDialerRandomKey(backing transport.Dialer, rand io.Reader) (*Dialer, error) {
+	key, err := _curve.GenerateKey(rand)
 	if err != nil {
 		return nil, err
 	}

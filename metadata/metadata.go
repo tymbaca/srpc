@@ -23,7 +23,8 @@ func ToContext(ctx context.Context, md Metadata) context.Context {
 }
 
 // FromContext gets [Metadata] from the context. It returns false if there is no
-// metadata in the context.
+// metadata in the context. If called from server-side service implementation
+// methods it always returns true.
 func FromContext(ctx context.Context) (Metadata, bool) {
 	md, ok := ctx.Value(metadataCtxKey{}).(Metadata)
 	return md, ok
