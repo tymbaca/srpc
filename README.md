@@ -1,3 +1,5 @@
+![GoDoc](https://pkg.go.dev/github.com/tymbaca/srpc)
+
 # sRPC - Stupid RPC
 
 Package srpc provides simple and composable RPC implementation, similar to
