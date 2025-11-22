@@ -22,7 +22,7 @@ import (
 // NewServer creates new [Server] with provided codec and options.
 func NewServer(codec codec.Codec, opts ...ServerOption) *Server {
 	s := &Server{
-		enc:            enc.Context{Version: encVersion, IgnoreVersion: false},
+		enc:            encContext,
 		codec:          codec,
 		logger:         logger.NoopLogger{},
 		streamResponse: false,

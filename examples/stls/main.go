@@ -146,12 +146,12 @@ func mainInmem() {
 
 	// here we can try to create the client without sTLS and see what will
 	// happen
-	// {
-	// 	client := NewEchoServiceClient(srpc.NewClient(serverPeer.Addr(), json.Codec, stdnet.NewDialer("tcp")))
-	//
-	// 	_, err := client.Echo(ctx, "hello")
-	// 	if err != nil {
-	// 		fmt.Println("client without sTLS, err:", err)
-	// 	}
-	// }
+	{
+		client := NewEchoServiceClient(srpc.NewClient(serverPeer.Addr(), json.Codec, clientPeer))
+
+		_, err := client.Echo(ctx, "hello")
+		if err != nil {
+			fmt.Println("client without sTLS, err:", err)
+		}
+	}
 }
