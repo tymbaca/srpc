@@ -1,3 +1,4 @@
+// Package logger provides logger interface for srpc and few basic implementations.
 package logger
 
 import "log/slog"

@@ -1,3 +1,4 @@
+// Package codec provides abstract codec layer for encoding and decoding values.
 package codec
 
 import "io"
