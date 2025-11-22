@@ -3,6 +3,7 @@ package stls
 import (
 	"crypto/ecdh"
 	_ "crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 
@@ -48,7 +49,15 @@ func (l *Listener) Accept() (transport.Conn, error) {
 		return nil, err
 	}
 
-	return handshake(conn, l.key, true)
+	stlsConn, err := handshake(conn, l.key, true)
+	if err != nil {
+		if closeErr := conn.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+		return nil, err
+	}
+
+	return stlsConn, nil
 }
 
 // Close closes the listener.
