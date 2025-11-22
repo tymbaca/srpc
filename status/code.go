@@ -30,9 +30,6 @@ const (
 	// returned by [Client.Call] when it failed to decode server response
 	// body (i.e. server sent response of invalid format).
 	InternalError Code = 6
-	// TransportError is used when something went wrong on the transport
-	// layer. Can be used by transport implementation.
-	TransportError Code = 7
 )
 
 // String returns string representation of [Code].
