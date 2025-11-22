@@ -7,4 +7,4 @@ import "github.com/tymbaca/srpc/enc"
 
 // Version is current version of sRPC. Used in the core layer and can be used in
 // transport implementations.
-var Version = enc.Version{Major: 0, Minor: 3, Patch: 1}
+var Version = enc.Version{Major: 0, Minor: 3, Patch: 2}
