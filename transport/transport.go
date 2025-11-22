@@ -1,3 +1,4 @@
+// Package transport provides abstract data transport layer for srpc.
 package transport
 
 import (

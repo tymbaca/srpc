@@ -1,16 +1,16 @@
 package enc
 
-// TODO: move to project root
-
 import (
 	"strings"
 
-	"github.com/tymbaca/srpc/pkg/fx"
+	"github.com/tymbaca/srpc/internal/fx"
 	"github.com/tymbaca/srpc/status"
 )
 
+// ServiceMethod represents service and method string
 type ServiceMethod = String // e.g. "Service.Method"
 
+// Split splits ServiceMethod into service and method strings.
 func (sm ServiceMethod) Split() (service string, method string, ok bool) {
 	parts := strings.Split(sm.Data, ".")
 	if len(parts) != 2 {
@@ -20,8 +20,10 @@ func (sm ServiceMethod) Split() (service string, method string, ok bool) {
 	return parts[0], parts[1], true
 }
 
+// Metadata holds metadata key-values.
 type Metadata Slice[MetadataPair]
 
+// NewMetadata creates new [Metadata] from map.
 func NewMetadata(m map[string][]string) Metadata {
 	if len(m) == 0 {
 		return Metadata{}
@@ -39,6 +41,7 @@ func NewMetadata(m map[string][]string) Metadata {
 	return Metadata(NewSlice(pairs...))
 }
 
+// Map returns Go map representation of [Metadata].
 func (m Metadata) Map() map[string][]string {
 	res := make(map[string][]string, m.Len)
 	for _, pair := range m.Data {

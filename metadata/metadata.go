@@ -17,10 +17,14 @@ type Metadata map[string][]string
 
 type metadataCtxKey struct{}
 
+// ToContext puts md into the context.
 func ToContext(ctx context.Context, md Metadata) context.Context {
 	return context.WithValue(ctx, metadataCtxKey{}, md)
 }
 
+// FromContext gets [Metadata] from the context. It returns false if there is no
+// metadata in the context. If called from server-side service implementation
+// methods it always returns true.
 func FromContext(ctx context.Context) (Metadata, bool) {
 	md, ok := ctx.Value(metadataCtxKey{}).(Metadata)
 	return md, ok

@@ -2,14 +2,18 @@ package stls
 
 import (
 	"crypto/ecdh"
-	"crypto/rand"
+	_ "crypto/rand"
+	"errors"
 	"fmt"
+	"io"
 
 	transport "github.com/tymbaca/srpc/transport"
 )
 
-func NewListenerRandomKey(backing transport.Listener) (*Listener, error) {
-	key, err := _curve.GenerateKey(rand.Reader)
+// NewListenerRandomKey is the same as [NewListener] but it generates a key
+// using provided random reader (e.g. [rand.Reader]).
+func NewListenerRandomKey(backing transport.Listener, rand io.Reader) (*Listener, error) {
+	key, err := _curve.GenerateKey(rand)
 	if err != nil {
 		return nil, err
 	}
@@ -17,6 +21,8 @@ func NewListenerRandomKey(backing transport.Listener) (*Listener, error) {
 	return NewListener(backing, key)
 }
 
+// NewListener creates new stls listener with provided backing listener
+// and a private key.
 func NewListener(backing transport.Listener, key *ecdh.PrivateKey) (*Listener, error) {
 	if key.Curve() != _curve {
 		return nil, fmt.Errorf("invalid key curve: got %s, must be %s", key.Curve(), _curve)
@@ -28,6 +34,7 @@ func NewListener(backing transport.Listener, key *ecdh.PrivateKey) (*Listener, e
 	}, nil
 }
 
+// Listener provides stls security layer of the backing listener.
 type Listener struct {
 	backing transport.Listener
 	key     *ecdh.PrivateKey
@@ -42,7 +49,15 @@ func (l *Listener) Accept() (transport.Conn, error) {
 		return nil, err
 	}
 
-	return handshake(conn, l.key, true)
+	stlsConn, err := handshake(conn, l.key, false)
+	if err != nil {
+		if closeErr := conn.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+		return nil, err
+	}
+
+	return stlsConn, nil
 }
 
 // Close closes the listener.

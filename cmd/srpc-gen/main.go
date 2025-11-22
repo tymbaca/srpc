@@ -17,7 +17,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-const version = "v0.0.1"
+const version = "v0.1.0"
 
 type methodMeta struct {
 	Name     string

@@ -2,6 +2,7 @@ package stls
 
 import (
 	"bytes"
+	"crypto/rand"
 	"io"
 	"testing"
 
@@ -14,7 +15,7 @@ import (
 
 func newListener(c *inmem.Cluster) func() transport.Listener {
 	return func() transport.Listener {
-		l, err := NewListenerRandomKey(c.NewPeer().Listen())
+		l, err := NewListenerRandomKey(c.NewPeer().Listen(), rand.Reader)
 		if err != nil {
 			panic(err)
 		}
@@ -24,7 +25,7 @@ func newListener(c *inmem.Cluster) func() transport.Listener {
 
 func newDialer(c *inmem.Cluster) func() transport.Dialer {
 	return func() transport.Dialer {
-		d, err := NewDialerRandomKey(c.NewPeer())
+		d, err := NewDialerRandomKey(c.NewPeer(), rand.Reader)
 		if err != nil {
 			panic(err)
 		}
@@ -67,10 +68,10 @@ func TestInside(t *testing.T) {
 
 	interceptorDialer, interceptor := testutil.NewInterceptorDialer(clientPeer)
 
-	dialer, err := NewDialerRandomKey(interceptorDialer)
+	dialer, err := NewDialerRandomKey(interceptorDialer, rand.Reader)
 	require.NoError(t, err)
 
-	listener, err := NewListenerRandomKey(serverPeer.Listen())
+	listener, err := NewListenerRandomKey(serverPeer.Listen(), rand.Reader)
 	require.NoError(t, err)
 
 	clientMsg := bytes.Repeat([]byte("c"), 100)
@@ -103,7 +104,8 @@ func TestInside(t *testing.T) {
 
 	{
 		pubKeyLen := 65
-		handshakeLen := 1 + 1 + pubKeyLen + 1 + chacha20.NonceSizeX
+		// see [exchangeKeyMsg]
+		handshakeLen := 1 + 4 + 4 + 1 + pubKeyLen + 1 + chacha20.NonceSizeX
 
 		wdata := interceptor.WData.Bytes()
 		require.Len(t, wdata, handshakeLen+len(clientMsg))

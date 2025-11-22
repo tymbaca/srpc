@@ -1,5 +1,3 @@
-// Package chunked provides chunk-based IO,
-// inspired by Chunked Transfer Coding (RFC 9112 §7.1).
 package chunked
 
 import (
@@ -8,14 +6,18 @@ import (
 	"slices"
 )
 
+// NewWriter create a new [Writer].
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{w: w}
 }
 
+// Writer writes chunks into the backing w. It must be closed after all
+// data is sent, in order to signal [io.EOF] on the reading end.
 type Writer struct {
 	w io.Writer
 }
 
+// Write writes p in the chunk. It does nothing if len(p) == 0.
 func (w *Writer) Write(p []byte) (n int, err error) {
 	// Empty chunk is interpreted as EOF on the reader side
 	// To send final chunk caller must invoke Close
@@ -39,7 +41,7 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-// Close sends another chunk with zero length, signaling reading side the [io.EOF].
+// Close sends a chunk with zero length, signaling reading side the [io.EOF].
 func (w *Writer) Close() error {
 	_, err := w.write(nil)
 	return err

@@ -1,3 +1,5 @@
+// Package chunked provides chunk-based IO,
+// inspired by Chunked Transfer Coding (RFC 9112 §7.1).
 package chunked
 
 import (

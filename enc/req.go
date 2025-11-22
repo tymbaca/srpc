@@ -8,10 +8,11 @@ import (
 	"io"
 
 	"github.com/tymbaca/sbinary"
-	"github.com/tymbaca/srpc/pkg/chunked"
-	"github.com/tymbaca/srpc/pkg/fx"
+	"github.com/tymbaca/srpc/internal/chunked"
+	"github.com/tymbaca/srpc/internal/fx"
 )
 
+// Request is a request header.
 type Request struct {
 	Version       Version `sbin:"-"`
 	ServiceMethod ServiceMethod
@@ -19,6 +20,7 @@ type Request struct {
 	Body          io.Reader `sbin:"-"`
 }
 
+// ReadRequest reads request from r.
 func ReadRequest(c Context, r io.Reader) (Request, error) {
 	cr := chunked.NewReader(r)
 	var req Request
@@ -38,10 +40,10 @@ func ReadRequest(c Context, r io.Reader) (Request, error) {
 }
 
 // WriteRequest writes request into w.
-// Currently req.Body must be [*bytes.Buffer] when writing.
-// In future, chunked io will be needed for dynamically filled readers.
 func WriteRequest(c Context, w io.Writer, req Request) (err error) {
-	defer fx.CloseIfCloser(req.Body) // if body is pipe.ToReader we need to kill it's goroutine, in case if error happens and we exit before EOF
+	// if body is pipe.ToReader we need to kill it's goroutine,
+	// in case if error happens and we exit before EOF
+	defer fx.CloseIfCloser(req.Body)
 
 	req.Version = c.Version
 	cw := chunked.NewBufferWriter(w)

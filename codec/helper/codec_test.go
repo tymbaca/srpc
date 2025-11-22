@@ -1,4 +1,4 @@
-package codec
+package helper
 
 import (
 	"encoding/gob"

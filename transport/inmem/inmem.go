@@ -1,3 +1,4 @@
+// Package inmem provides in-memory srpc transport implementation.
 package inmem
 
 import (
@@ -13,8 +14,10 @@ import (
 	"github.com/tymbaca/srpc/transport"
 )
 
+// ErrPeerNotFound is returned in [Peer.Dial] if there is no peer with specified address.
 var ErrPeerNotFound = errors.New("peer not found")
 
+// Cluster represents a collection of [Peer]s that can connect to each other.
 type Cluster struct {
 	mu    sync.RWMutex
 	peers map[string]*Peer
@@ -22,12 +25,16 @@ type Cluster struct {
 	lastID uint64
 }
 
+// New creates new [Cluster].
 func New() *Cluster {
 	return &Cluster{
 		peers: make(map[string]*Peer),
 	}
 }
 
+// NewPeer creates new [Peer] with unique address.
+// The addres is an unsigned integer that gets incremented on each call.
+// It panics if too much peers was created (more then math.MaxUint64).
 func (c *Cluster) NewPeer() *Peer {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -59,28 +66,31 @@ func (c *Cluster) nextAddr() string {
 	return fmt.Sprint(c.lastID)
 }
 
+// Peer represents a single node the cluster.
+// It can act as both a [transport.Dialer] and a [transport.Listener].
 type Peer struct {
 	cluster *Cluster
 	addr    string
 	inbox   chan *conn
 }
 
-func (p *Peer) Listen() *PeerListener {
-	l := &PeerListener{
+// Listen creates a new [transport.Listener]. It's callers responsibily to close the listener.
+func (p *Peer) Listen() transport.Listener {
+	l := &peerListener{
 		parent: p,
 	}
 	l.ctx, l.cancel = context.WithCancel(context.Background())
 	return l
 }
 
-type PeerListener struct {
+type peerListener struct {
 	parent *Peer
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-// Accept implements [srpc.Listerner].
-func (pl *PeerListener) Accept() (transport.Conn, error) {
+// Accept implements [transport.Listener].
+func (pl *peerListener) Accept() (transport.Conn, error) {
 	debug("wait for conn on inbox, peer: %+v", pl.parent)
 
 	select {
@@ -91,17 +101,18 @@ func (pl *PeerListener) Accept() (transport.Conn, error) {
 	}
 }
 
-// Close implements [srpc.Listerner].
-func (pl *PeerListener) Close() error {
+// Close implements [transport.Listener].
+func (pl *peerListener) Close() error {
 	pl.cancel()
 	return nil
 }
 
-// Addr implements [srpc.Listerner].
-func (pl *PeerListener) Addr() string {
+// Addr implements [transport.Listener].
+func (pl *peerListener) Addr() string {
 	return pl.parent.addr
 }
 
+// Dial implements [transport.Dialer]
 func (p *Peer) Dial(ctx context.Context, addr string) (transport.Conn, error) {
 	target := p.cluster.getPeer(addr)
 	if target == nil {
@@ -127,6 +138,7 @@ func (p *Peer) Dial(ctx context.Context, addr string) (transport.Conn, error) {
 	}, nil
 }
 
+// Addr returns the address of current peer.
 func (p *Peer) Addr() string {
 	return p.addr
 }

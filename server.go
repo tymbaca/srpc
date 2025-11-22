@@ -9,18 +9,20 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/tymbaca/srpc/codec"
 	"github.com/tymbaca/srpc/enc"
+	"github.com/tymbaca/srpc/internal/fx"
+	"github.com/tymbaca/srpc/internal/pipe"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
-	"github.com/tymbaca/srpc/pkg/fx"
-	"github.com/tymbaca/srpc/pkg/pipe"
 	"github.com/tymbaca/srpc/status"
 	"github.com/tymbaca/srpc/transport"
 )
 
-func NewServer(codec Codec, opts ...ServerOption) *Server {
+// NewServer creates new [Server] with provided codec and options.
+func NewServer(codec codec.Codec, opts ...ServerOption) *Server {
 	s := &Server{
-		enc:            enc.Context{Version: encVersion, IgnoreVersion: false},
+		enc:            encContext,
 		codec:          codec,
 		logger:         logger.NoopLogger{},
 		streamResponse: false,
@@ -34,9 +36,11 @@ func NewServer(codec Codec, opts ...ServerOption) *Server {
 	return s
 }
 
+// Server is the RPC server. It holds registered services with methods
+// and calls them when it gets the request with matching ServiceName.
 type Server struct {
 	enc              enc.Context
-	codec            Codec
+	codec            codec.Codec
 	logger           logger.Logger
 	streamResponse   bool
 	connErrorHandler func(error) error
@@ -57,11 +61,24 @@ type method struct {
 	val reflect.Value
 }
 
+// Register registers the provided service impl into the server.
+// It registers it with the name of provided T, e.g.:
+// - `Register(s, MyServiceImpl{})` will register it as "MyServiceImpl",
+// - `Register[MyService](s, MyServiceImpl{})` will register it as "MyService".
 func Register[T any](s *Server, impl T) {
-	RegisterWithName(s, impl, "")
+	registerWithName(s, impl, "")
 }
 
+// RegisterWithName registers the provided service impl into the server with provided name.
+// If name == "", nothing will happen.
 func RegisterWithName[T any](s *Server, impl T, name string) {
+	if name == "" {
+		return
+	}
+	registerWithName(s, impl, name)
+}
+
+func registerWithName[T any](s *Server, impl T, name string) {
 	t := reflect.TypeFor[T]()
 	v := reflect.ValueOf(impl)
 
@@ -139,7 +156,10 @@ func (s *Server) handleConn(ctx context.Context, conn transport.Conn) (err error
 
 	resp := s.handleReq(ctx, req)
 
-	drain(req.Body)
+	if err := drain(req.Body); err != nil {
+		return fmt.Errorf("drain remaining request body: %w", err)
+	}
+
 	return enc.WriteResponse(s.enc, conn, resp)
 }
 
@@ -280,6 +300,10 @@ func toValues(ins ...any) []reflect.Value {
 	return outs
 }
 
-func drain(r io.Reader) {
-	io.Copy(io.Discard, r)
+func drain(r io.Reader) error {
+	if r == nil {
+		return nil
+	}
+	_, err := io.Copy(io.Discard, r)
+	return err
 }

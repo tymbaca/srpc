@@ -1,3 +1,4 @@
+// Package testutil provides common tests and utilities for transport implementations.
 package testutil
 
 import (
@@ -12,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/call"
-	"github.com/tymbaca/srpc/codec"
+	"github.com/tymbaca/srpc/codec/json"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
 	"github.com/tymbaca/srpc/status"
@@ -34,14 +35,14 @@ func TestSimple(t *testing.T, newListener func() transport.Listener, newDialer f
 	dialer := newDialer()
 	listener := newListener()
 
-	server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithConnErrorHandler(func(err error) error {
-		// panic(err)
-		return nil // TODO: undo
+	server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithConnErrorHandler(func(err error) error {
+		panic(err)
+		// return nil // TODO: undo
 	})))
 	defer server.Close()
 	go server.Start(ctx, listener)
 
-	client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, dialer))
+	client := NewTestServiceClient(srpc.NewClient(listener.Addr(), json.Codec, dialer))
 	{
 		resp, err := client.Add(ctx, AddReq{A: 10, B: 15})
 		require.NoError(t, err)
@@ -102,11 +103,11 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("single client", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
-		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, newDialer()))
+		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), json.Codec, newDialer()))
 		resp, err := client.Add(ctx, AddReq{A: 10, B: 15})
 		require.NoError(t, err)
 		require.Equal(t, 25, resp.Result)
@@ -114,7 +115,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("close conn after successful dial (no goroutines must be left)", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
@@ -122,7 +123,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 		d, cancel := newInterruptDialer(ctx, newDialer(), &interruptConfig{CloseAfterDial: true})
 		defer cancel()
 
-		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, d))
+		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), json.Codec, d))
 
 		// NOTE: we need big input to exceed the [chunked.BufferedWriter] buffer,
 		// because if we use smaller input, then we won't catch leaking
@@ -145,11 +146,11 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("single client, context check", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
-		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, newDialer()))
+		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), json.Codec, newDialer()))
 		wait := 20 * time.Millisecond
 		waitCheck := 25 * time.Millisecond
 		t.Run("timeout", func(t *testing.T) {
@@ -192,7 +193,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 	})
 
 	t.Run("server, context check", func(t *testing.T) {
-		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 
 		wait := 20 * time.Millisecond
@@ -236,7 +237,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("multiple clients parallel each multiple calls", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
@@ -245,7 +246,7 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, newDialer()))
+				client := NewTestServiceClient(srpc.NewClient(listener.Addr(), json.Codec, newDialer()))
 				for range callPerClient {
 					req := AddReq{A: rand.Int(), B: rand.Int()}
 					resp, err := client.Add(ctx, req)
@@ -259,13 +260,13 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 
 	t.Run("multiple clients parallel each multiple calls | close", func(t *testing.T) {
 		listener := newListener()
-		server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+		server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 		defer server.Close()
 		go server.Start(ctx, listener)
 
 		for range clientCount {
 			go func() {
-				client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, newDialer()))
+				client := NewTestServiceClient(srpc.NewClient(listener.Addr(), json.Codec, newDialer()))
 				for {
 					req := AddReq{A: rand.Int(), B: rand.Int()}
 					_, err := client.Add(ctx, req)
@@ -287,11 +288,11 @@ func Benchmark(b *testing.B, newListener func() transport.Listener, newDialer fu
 	dialer := newDialer()
 	listener := newListener()
 
-	server := NewTestServiceServer(srpc.NewServer(codec.JSON, srpc.WithLogger(logger.DefaulSLogger{})))
+	server := NewTestServiceServer(srpc.NewServer(json.Codec, srpc.WithLogger(logger.DefaultSLogger{})))
 	defer server.Close()
 	go server.Start(ctx, listener)
 
-	client := NewTestServiceClient(srpc.NewClient(listener.Addr(), codec.JSON, dialer))
+	client := NewTestServiceClient(srpc.NewClient(listener.Addr(), json.Codec, dialer))
 
 	for b.Loop() {
 		req := AddReq{A: rand.Int(), B: rand.Int()}

@@ -8,11 +8,12 @@ import (
 	"io"
 
 	"github.com/tymbaca/sbinary"
-	"github.com/tymbaca/srpc/pkg/chunked"
-	"github.com/tymbaca/srpc/pkg/fx"
+	"github.com/tymbaca/srpc/internal/chunked"
+	"github.com/tymbaca/srpc/internal/fx"
 	"github.com/tymbaca/srpc/status"
 )
 
+// Response is a response header.
 type Response struct {
 	Version    Version `sbin:"-"` // set by [Encoder]
 	StatusCode StatusCode
@@ -21,6 +22,7 @@ type Response struct {
 	Body       io.Reader `sbin:"-"` // nil if Error != nil
 }
 
+// ReadResponse reads response from r
 func ReadResponse(c Context, r io.Reader) (Response, error) {
 	cr := chunked.NewReader(r)
 	var resp Response
