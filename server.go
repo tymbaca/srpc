@@ -156,7 +156,10 @@ func (s *Server) handleConn(ctx context.Context, conn transport.Conn) (err error
 
 	resp := s.handleReq(ctx, req)
 
-	_ = drain(req.Body)
+	if err := drain(req.Body); err != nil {
+		return fmt.Errorf("drain remaining request body: %w", err)
+	}
+
 	return enc.WriteResponse(s.enc, conn, resp)
 }
 

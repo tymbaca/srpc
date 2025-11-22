@@ -104,7 +104,8 @@ func TestInside(t *testing.T) {
 
 	{
 		pubKeyLen := 65
-		handshakeLen := 1 + 1 + pubKeyLen + 1 + chacha20.NonceSizeX
+		// see [exchangeKeyMsg]
+		handshakeLen := 1 + 4 + 4 + 1 + pubKeyLen + 1 + chacha20.NonceSizeX
 
 		wdata := interceptor.WData.Bytes()
 		require.Len(t, wdata, handshakeLen+len(clientMsg))
