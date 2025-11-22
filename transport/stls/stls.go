@@ -25,7 +25,7 @@ var _proto = [...]byte{'s', 't', 'l', 's'}
 
 type exchangeKeyMsg struct {
 	Version  uint8   // currently no-op, always 1
-	Seq      uint32  // leader peer randomly generates it. second peer incremetns it by 1 and sends it back
+	Seq      uint32  // leader peer randomly generates it. second peer increments it by 1 and sends it back
 	Proto    [4]byte // always "stls"
 	KeyLen   uint8   `sbin:"lenof:Key"`
 	Key      []byte
