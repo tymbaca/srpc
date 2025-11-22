@@ -32,6 +32,13 @@ type UserFilter struct{
 type Empty struct{}
 ```
 
+Get `srpc` and `srpc-gen` (for type-safe client/server generation):
+
+```
+go get github.com/tymbaca/srpc@latest
+go install github.com/tymbaca/srpc/cmd/srpc-gen@latest
+```
+
 Put `go:generate` comment with `srpc-gen --target=UserService` in the same
 package, e.g.:
 
