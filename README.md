@@ -1,6 +1,6 @@
-![GoDoc](https://pkg.go.dev/github.com/tymbaca/srpc)
-
 # sRPC - Stupid RPC
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/tymbaca/srpc.svg)](https://pkg.go.dev/github.com/tymbaca/srpc)
 
 Package srpc provides simple and composable RPC implementation, similar to
 standard `net/rpc` but with `context.Context` support and type-safe client/server
