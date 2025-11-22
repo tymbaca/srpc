@@ -32,6 +32,8 @@ type UserFilter struct{
 type Empty struct{}
 ```
 
+Note that currently only `func(context.Context, A) (B, error)` methods are supported. Other methods won't be registrated.
+
 Get `srpc` and `srpc-gen` (for type-safe client/server generation):
 
 ```
