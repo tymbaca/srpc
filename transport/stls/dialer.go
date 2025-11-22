@@ -47,5 +47,5 @@ func (d *Dialer) Dial(ctx context.Context, addr string) (transport.Conn, error) 
 		return nil, err
 	}
 
-	return handshake(conn, d.key, false)
+	return handshake(conn, d.key, false) // TODO: client is lead
 }

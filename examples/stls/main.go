@@ -11,6 +11,7 @@ import (
 	"github.com/tymbaca/srpc/codec/json"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/transport"
+	"github.com/tymbaca/srpc/transport/inmem"
 	"github.com/tymbaca/srpc/transport/stdnet"
 	"github.com/tymbaca/srpc/transport/stls"
 )
@@ -29,6 +30,10 @@ type EchoStructResp struct {
 }
 
 func main() {
+	mainInmem()
+}
+
+func mainTcp() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -91,4 +96,62 @@ func main() {
 			fmt.Println("client without sTLS, err:", err)
 		}
 	}
+}
+
+func mainInmem() {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cluster := inmem.New()
+	serverPeer := cluster.NewPeer()
+	clientPeer := cluster.NewPeer()
+
+	go func() {
+		server := NewEchoServiceServer(srpc.NewServer(
+			json.Codec,
+			srpc.WithStreamingResponse(true),
+			srpc.WithLogger(logger.DefaultSLogger{}),
+		))
+		defer server.Close()
+
+		// Wrap listener with sTLS
+		l, err := stls.NewListenerRandomKey(serverPeer.Listen(), rand.Reader)
+		if err != nil {
+			panic(err)
+		}
+
+		err = server.Start(ctx, l)
+		if errors.Is(err, transport.ErrListenerClosed) {
+			return
+		} else if err != nil {
+			slog.Error(err.Error())
+		}
+	}()
+
+	// Wrap dialer with sTLS
+	d, err := stls.NewDialerRandomKey(clientPeer, rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+
+	client := NewEchoServiceClient(srpc.NewClient(serverPeer.Addr(), json.Codec, d))
+
+	resp, err := client.Echo(ctx, "hello")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("msg from server:", resp)
+
+	// here we can try to create the client without sTLS and see what will
+	// happen
+	// {
+	// 	client := NewEchoServiceClient(srpc.NewClient(serverPeer.Addr(), json.Codec, stdnet.NewDialer("tcp")))
+	//
+	// 	_, err := client.Echo(ctx, "hello")
+	// 	if err != nil {
+	// 		fmt.Println("client without sTLS, err:", err)
+	// 	}
+	// }
 }
