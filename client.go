@@ -11,13 +11,12 @@ import (
 	"github.com/tymbaca/srpc/internal/callsuite"
 	"github.com/tymbaca/srpc/internal/fx"
 	"github.com/tymbaca/srpc/internal/pipe"
-	"github.com/tymbaca/srpc/internal/version"
 	"github.com/tymbaca/srpc/metadata"
 	"github.com/tymbaca/srpc/status"
 	"github.com/tymbaca/srpc/transport"
 )
 
-var encContext = enc.Context{Version: version.Version, IgnoreVersion: true}
+var encContext = enc.Context{Version: Version, IgnoreVersion: true}
 
 // NewClient create a new [Client] with provided address, codec and connector.
 func NewClient(addr string, codec codec.Codec, dialer transport.Dialer) *Client {

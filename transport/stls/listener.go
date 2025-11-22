@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/tymbaca/srpc/enc"
-	"github.com/tymbaca/srpc/internal/version"
-	"github.com/tymbaca/srpc/status"
 	transport "github.com/tymbaca/srpc/transport"
 )
 
@@ -54,15 +51,9 @@ func (l *Listener) Accept() (transport.Conn, error) {
 
 	stlsConn, err := handshake(conn, l.key, false)
 	if err != nil {
-		defer conn.Close()
-		if respErr := enc.WriteResponse(enc.Context{Version: version.Version}, conn, enc.Response{
-			StatusCode: status.TransportError,
-			Error:      errors.New("server expects sTLS handshake"),
-			Body:       nil,
-		}); respErr != nil {
-			err = errors.Join(err, respErr)
+		if closeErr := conn.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
 		}
-
 		return nil, err
 	}
 
