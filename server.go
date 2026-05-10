@@ -45,9 +45,14 @@ type Server struct {
 	streamResponse   bool
 	connErrorHandler func(error) error
 
-	services map[string]service
-	l        transport.Listener
+	services   map[string]service
+	l          transport.Listener
+	middlwares []Middleware
 }
+
+type Handler func(ctx context.Context, reqmeta enc.Request, req any) (resp any, err error)
+
+type Middleware func(next Handler) Handler
 
 type service struct {
 	name string
@@ -182,28 +187,42 @@ func (s *Server) handleReq(ctx context.Context, req enc.Request) (resp enc.Respo
 	return s.call(method, ctx, req)
 }
 
-func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.Response {
-	ctx = metadata.ToContext(ctx, req.Metadata.Map())
+func (s *Server) call(method method, ctx context.Context, reqmeta enc.Request) enc.Response {
+	ctx = metadata.ToContext(ctx, reqmeta.Metadata.Map())
 
 	var respMD metadata.Metadata
 	ctx = metadata.ResponseToContext(ctx, &respMD)
 
-	argVal := reflect.New(method.val.Type().In(1))
-	err := s.codec.Decode(req.Body, argVal.Interface())
+	req := reflect.New(method.val.Type().In(1))
+	err := s.codec.Decode(reqmeta.Body, req.Interface())
 	if err != nil {
 		return respErrorf(respMD, status.InvalidArgument, "can't decode input values: %w", err)
 	}
 
-	retVals := method.val.Call(toValues(ctx, argVal.Elem().Interface()))
+	var h Handler = func(ctx context.Context, reqmeta enc.Request, req any) (resp any, err error) {
+		retVals := method.val.Call(toValues(ctx, req))
 
-	ret := retVals[0].Interface()
-	if !retVals[1].IsNil() {
-		err := retVals[1].Interface().(error)
+		ret := retVals[0].Interface()
+		if !retVals[1].IsNil() {
+			err := retVals[1].Interface().(error)
+			return nil, err
+		}
+
+		return ret, nil
+	}
+
+	for _, m := range s.middlwares {
+		h = m(h)
+	}
+
+	ret, err := h(ctx, reqmeta, req.Elem().Interface())
+	if err != nil {
 		if code, ok := status.FromError(err); ok {
 			// to prevent duplicate code description on client, e.g. "InvalidArgument: InvalidArgument: <errorText>"
 			errMsg := strings.TrimSuffix(err.Error(), code.String()+": ") // (yes, i know)
 			return respError(respMD, code, errMsg)
 		}
+
 		return respErrorf(respMD, status.ErrorFromService, "error from service: %w", err)
 	}
 
@@ -213,8 +232,7 @@ func (s *Server) call(method method, ctx context.Context, req enc.Request) enc.R
 		)
 	}
 
-	bodyBuf := bytes.NewBuffer(nil)
-	bodyBuf.Grow(int(retVals[0].Type().Size())) // this is not an exact size, but it can be a good hint
+	bodyBuf := bytes.NewBuffer(nil) // TODO: use sync.Pool
 	if err := s.codec.Encode(bodyBuf, ret); err != nil {
 		return respErrorf(respMD, status.InternalError, "can't encode return values: %w", err)
 	}

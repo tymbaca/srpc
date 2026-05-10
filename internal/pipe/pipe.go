@@ -17,6 +17,7 @@ func ToReader(fn func(w io.Writer) error) (r io.ReadCloser) {
 			w.CloseWithError(err)
 			return
 		}
+
 		w.Close()
 	}()
 

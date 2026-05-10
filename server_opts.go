@@ -5,6 +5,14 @@ import "github.com/tymbaca/srpc/logger"
 // ServerOption modifies the server when passed into [NewServer].
 type ServerOption func(s *Server)
 
+// WithMiddlwares appends middlewares to server. Middlwares are called from
+// the end of middleware slice.
+func WithMiddlwares(middlewares ...Middleware) ServerOption {
+	return func(s *Server) {
+		s.middlwares = append(s.middlwares, middlewares...)
+	}
+}
+
 // WithLogger sets provided logger in the server.
 func WithLogger(logger logger.Logger) ServerOption {
 	return func(s *Server) {

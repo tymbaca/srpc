@@ -14,6 +14,7 @@ import (
 	"github.com/tymbaca/srpc"
 	"github.com/tymbaca/srpc/call"
 	"github.com/tymbaca/srpc/codec/json"
+	"github.com/tymbaca/srpc/enc"
 	"github.com/tymbaca/srpc/logger"
 	"github.com/tymbaca/srpc/metadata"
 	"github.com/tymbaca/srpc/status"
@@ -280,6 +281,41 @@ func TestComplex(t *testing.T, newListener func() transport.Listener, newDialer 
 		time.Sleep(50 * time.Millisecond)
 		server.Close()
 		time.Sleep(50 * time.Millisecond)
+	})
+
+	t.Run("middlewares", func(t *testing.T) {
+		var log []string
+
+		listener := newListener()
+		server := NewTestServiceServer(srpc.NewServer(
+			json.Codec,
+			srpc.WithLogger(logger.DefaultSLogger{}),
+			srpc.WithMiddlwares(
+				func(next srpc.Handler) srpc.Handler {
+					return func(ctx context.Context, reqmeta enc.Request, req any) (resp any, err error) {
+						log = append(log, reqmeta.ServiceMethod.String())
+						return next(ctx, reqmeta, req)
+					}
+				},
+			),
+		))
+		defer server.Close()
+		go server.Start(ctx, listener)
+
+		client := NewTestServiceClient(srpc.NewClient(listener.Addr(), json.Codec, newDialer()))
+		resp, err := client.Add(ctx, AddReq{A: 10, B: 15})
+		require.NoError(t, err)
+		require.Equal(t, 25, resp.Result)
+
+		resp, err = client.Add(ctx, AddReq{A: 10, B: 15})
+		require.NoError(t, err)
+		require.Equal(t, 25, resp.Result)
+
+		divResp, err := client.Divide(ctx, DivideReq{A: 10, B: 5})
+		require.NoError(t, err)
+		require.Equal(t, 2, divResp.Result)
+
+		require.Equal(t, []string{"TestService.Add", "TestService.Add", "TestService.Divide"}, log)
 	})
 }
 
